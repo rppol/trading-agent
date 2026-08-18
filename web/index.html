@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>trading-agent — commodity signals from unstructured data</title>
+<meta name="description" content="Architecture, working prototype, failure-mode register and cost model for an LLM-driven commodity trading-signal platform.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..600&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#9634;</text></svg>">
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1 class="wordmark">trading<span class="slash">-</span>agent</h1>
+    <div class="dateline">
+      <span id="dl-window">—</span>
+      <span id="dl-corpus">—</span>
+      <span id="dl-extractor">—</span>
+    </div>
+    <p class="standfirst">
+      Turning news, imagery and vessel traffic into commodity signals — where the model
+      extracts evidence and the arithmetic makes the call.
+    </p>
+    <nav class="tabs">
+      <a href="#/">Overview</a>
+      <a href="#/signals">Live signals</a>
+      <a href="#/architecture">Architecture</a>
+      <a href="#/failure-modes">Failure modes</a>
+      <a href="#/cost">Cost</a>
+    </nav>
+  </div>
+</header>
+
+<main id="view"><p class="loading">Loading…</p></main>
+
+<footer><div>
+  trading-agent · prototype for the Mintelligence assignment ·
+  signals extracted from GDELT GKG by an LLM ·
+  <a href="https://github.com/rppol/trading-agent">source</a>
+</div></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+name: test and deploy
+
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Install
+        run: pip install -r requirements.txt
+
+      # No API key and no network model call in CI. The committed fixtures are
+      # real GDELT documents and real LLM extractions, replayed deterministically
+      # so a reviewer gets byte-identical output to the authored run.
+      - name: Tests
+        run: python tests/test_pipeline.py
+
+      - name: Rebuild store from fixtures and export
+        run: |
+          python - <<'PY'
+          import json
+          from signals.store import connect, upsert_documents, insert_claims
+          conn = connect()
+          docs = [json.loads(l) for l in open('fixtures/documents.jsonl')]
+          upsert_documents(conn, docs)
+          for d in docs:
+              conn.execute("UPDATE documents SET cluster_id=?, novelty=? WHERE doc_id=?",
+                           (d['cluster_id'], d['novelty'], d['doc_id']))
+          conn.commit()
+          claims = [json.loads(l) for l in open('fixtures/claims.jsonl')]
+          insert_claims(conn, claims)
+          print('restored', len(docs), 'docs', len(claims), 'claims')
+          PY
+          python -m signals.export
+
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp -r web/* _site/
+          mkdir -p _site/docs && cp docs/*.md _site/docs/
+
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
