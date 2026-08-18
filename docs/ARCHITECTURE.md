@@ -291,24 +291,111 @@ rolling and recalibrated frequently — an approximation, and named as one.
 
 ---
 
-## 7. Serving: two latency classes that must not touch
+## 7. Serving, and the SLO the brief asks for is the wrong one
 
-| Class | Route | Target | Path |
-|---|---|---|---|
-| Cached | `GET /v1/signals/coffee` | p99 < 50 ms | Precomputed, in-memory TTL over the store |
-| Point-in-time | `GET /v1/signals/coffee?as_of=` | p99 < 100 ms | One indexed predicate on `ingest_time` |
-| Fresh | `POST /v1/refresh` → `GET /v1/jobs/{id}` | minutes | Async job, LLM in the loop |
-| Evidence | `GET /v1/claims` | p99 < 50 ms | The audit trail behind every number |
+### The latency budget nobody measures
 
-Putting fresh inference behind a synchronous endpoint is the classic mistake: one slow call
-turns a sub-second SLO into a timeout during exactly the news storm the system exists to
-handle. The split is architectural, not a tuning detail.
+Decompose "event happens" to "signal visible" and the stages we control almost vanish:
 
-Every response carries **staleness**. A caller acting on a signal is entitled to know how
-old the newest evidence beneath it is, and hiding that is how a stale signal gets traded as
-a fresh one during an outage.
+| Path | Source publication lag | Our pipeline | **Our share** |
+|---|---:|---:|---:|
+| Wire headline | ~300 s | ~30 s | **9%** |
+| Satellite AIS | ~1,800 s | ~30 s | **1.6%** |
+| Satellite imagery | ~43,200 s | ~60 s | **0.14%** |
+| Scheduled macro (WASDE, COT) | ~604,800 s data age | ~30 s | **0.005%** |
 
----
+Halving our pipeline improves what the trader experiences by **4.5% on the best path** and by
+nothing measurable on the others. Meanwhile the largest *controllable* term is not compute at
+all — it is **poll interval**, which contributes interval/2 in median lag. Moving a wire feed
+from 60-second polling to push beats every other latency optimisation in this document
+combined, and it is a config change.
+
+**We cannot win the headline race and should not claim to.** Firms trading directly off
+binary multicast wire feeds operate at 99.99% under 50 microseconds. An LLM in the loop is six
+orders of magnitude away. Any architecture with a language model in the decision path is
+structurally incapable of that trade, and pretending otherwise is how you get sued.
+
+### So promise freshness, not latency
+
+| Promise | Target |
+|---|---|
+| Read path — any precomputed signal, any `as_of` | p99 < 250 ms — **a UI-responsiveness SLO, not a trading one** |
+| Point-in-time replay, arbitrary `as_of` | p99 < 2 s |
+| Fresh path — document **arrival** → signal updated | p50 90 s, p95 6 min |
+| Freshness honesty | **100% of responses carry evidence timestamps. Zero silent staleness.** |
+| Explicitly not promised | Reaction time relative to the market |
+
+Measuring the fresh path from *arrival* rather than from *event* is the honest choice: quoting
+from-event numbers means quoting your vendor's lag as your own achievement.
+
+### Sub-second is free, because point-in-time reads are immutable
+
+A signal at `as_of=T` filtered on `ingest_time <= T` **can never change**, because no future
+write alters the past. Therefore:
+
+- There is no cache *invalidation* problem. There is only key creation.
+- Historical reads have infinite TTL and content-addressed keys.
+- The only mutable key in the system is the `latest` pointer per commodity, updated by one
+  atomic swap.
+
+This property is worth more than any cache technology choice, and it falls out of the
+two-clocks decision (§3) for free. A Postgres primary failure still serves every cached
+historical query correctly; only `latest` degrades.
+
+### The burst case: 500 documents about one earthquake in 90 seconds
+
+The answer is not to scale extraction. It is to collapse the input — and it is the highest
+leverage engineering in the fresh path.
+
+```mermaid
+flowchart LR
+    A(["500 docs<br/>in 90 s"]) --> B["SimHash near-dup"]
+    B -->|"~380 collapsed"| C["Embed + cluster"]
+    C -->|"~120 docs<br/>3-4 events"| D{"Select per cluster"}
+    D -->|"first-seen<br/>+ top-3 authority<br/>+ novel vs centroid"| E["~15 LLM calls"]
+    D -->|"~480 docs"| F[("Corroboration<br/>weight")]
+    E --> G[("Claim ledger")]
+    F --> G
+
+    classDef src fill:#3b4252,stroke:#81a1c1,color:#eceff4
+    classDef work fill:#4c566a,stroke:#88c0d0,color:#eceff4
+    classDef gate fill:#4c566a,stroke:#ebcb8b,color:#eceff4
+    classDef store fill:#2e3440,stroke:#a3be8c,color:#eceff4
+    class A src
+    class B,C,E work
+    class D gate
+    class F,G store
+```
+
+**500 documents become ~15 model calls**, roughly 30–90 seconds wall clock at modest
+concurrency, with no additional GPU. The 480 unextracted documents are not dropped — they are
+cheap evidence, and "480 independent outlets say this" is an input the aggregation already
+wants. Extracting all 500 would cost 33× more and produce 480 near-identical claim sets that
+would then need deduplicating anyway.
+
+### Degrading in public
+
+The volatility spike that makes signals valuable simultaneously multiplies document volume,
+degrades your upstream providers (every one of their customers is hammering them too), and
+rate-limits your model provider. These are not independent failures; they are one failure with
+five symptoms.
+
+The cardinal rule: **a stale signal must never be visually indistinguishable from a fresh one.**
+
+| Level | Behaviour | What the desk sees |
+|---|---|---|
+| `LIVE` | Everything current | Evidence timestamps |
+| `LAGGING` | Extraction behind | Pending count, last-update age |
+| `PARTIAL` | A source class is down | Per-source health, **confidence interval widened** |
+| `ARITHMETIC-ONLY` | Model path circuit-broken | Scores over existing claims, banner naming the cutoff |
+| `FROZEN` | Ingestion broken | Read-only snapshot, value greyed, do-not-trade marker |
+
+`PARTIAL` is the important one: the degradation shows up **in the number's uncertainty**, not
+only in a badge a stressed trader will not read.
+
+The only test that catches this is **replaying a real historical spike at 10× rate** and
+asserting zero documents lost and every transition firing in order. Synthetic load will not
+reproduce a correlated failure.
 
 ## 8. Multimodal: process areas of interest, not scenes
 
@@ -439,18 +526,56 @@ The gate between stages is not a date, it is evidence: **do not build stage N+1 
 has a signal with measurable, cost-surviving information coefficient.** A platform with
 excellent infrastructure and no edge is a more expensive failure than a spreadsheet.
 
-## 11. What this design deliberately does not do
+## 11. Technology choices, and what each replaces
+
+Boring, single-node, and justified by the measured volumes rather than by the shape of the
+diagram.
+
+| Concern | Choice | Instead of | Why |
+|---|---|---|---|
+| System of record | **PostgreSQL** — bitemporal claims, documents, materialized signals | A distributed store | ~10k claims/day ≈ 3.6M rows/year. A table with two indexes |
+| Queue | **Postgres `SELECT … FOR UPDATE SKIP LOCKED`** | Kafka, Redpanda | Sustains ~10k jobs/s; we peak at 5.5/s. Kafka buys replay we already have from the bitemporal store, at the price of a second durability model |
+| Vectors | **pgvector, HNSW** | Pinecone, Weaviate, Qdrant | 3.6M vectors fits one box, and embeddings share a transaction with the claims that cite them |
+| Ticks | **Parquet on object storage + DuckDB** | ClickHouse | ~110 GB/year. Adopt ClickHouse only when interactive multi-year tick queries become a *product surface* |
+| Cache | **In-process LRU, then Redis if measured** | Dragonfly | Dragonfly's edge appears near millions of ops/s; we serve tens to low hundreds |
+| Features | **A Postgres table with a covering index** | Feast, Tecton | A feature store solves train/serve skew at millions of entities. We have hundreds |
+| Inference | **Hosted API, batch tier for backfill** | Own GPUs | Break-even is ~20–50k docs/day. At 500 we are 40× short, and self-hosting converts a ~$200/month line into ~$2,500 plus an on-call rotation |
+
+If self-hosting ever is justified, **SGLang** rather than vLLM — not for headline throughput
+but for two properties of *this* workload: the extraction prompt is a large fixed prefix
+(RadixAttention's best case), and structured decoding runs on every single call, where vLLM
+degrades measurably at batch sizes ≥8. For GPU sharing, **MIG partitions, never time-slicing**
+— time-slicing has no memory isolation, so a backfill OOMs interactive inference. That is the
+starvation failure, implemented deliberately.
+
+---
+
+## 12. What this design deliberately does not build
 
 - **No LLM price forecasts.** The model extracts; it does not predict.
 - **No article scraping in the prototype.** GKG metadata and quotations avoid robots.txt,
   paywalls and CFAA exposure entirely. Full-text licensing is a stage-2 commercial decision.
-- **No streaming engine at 116 msg/s.** It would be infrastructure theatre.
-- **No self-hosted LLM at this volume.** A dedicated GPU costs more than the API below
-  roughly 20M tokens/day. We are two orders of magnitude under that.
+- **No streaming engine at 116 msg/s.** Infrastructure theatre.
+- **No self-hosted model at this volume.** See above.
 - **No fused multi-signal score.** The three signals decay differently and are kept apart.
+- **No Kubernetes before there are five deployables.**
+- **No optimisation of the pipeline below ~30 s.** It is 0.005–9% of what the trader
+  experiences; the return is zero.
 
-Every one of these becomes wrong at some scale. Each is a decision with a stated trigger,
-not an omission.
+Each becomes wrong at some scale, so each carries a trigger rather than a prohibition:
+
+| Build it when | Trigger |
+|---|---|
+| Streaming cluster | Sustained >50k msgs/s fanning out to ≥3 independent consumers |
+| Kubernetes | >5 independently deployed services |
+| Vector database | pgvector p99 >100 ms at the target recall |
+| Own GPUs | ~20k documents/day sustained |
+| ClickHouse | Interactive multi-year tick queries become a product surface |
+| Fine-tuned extractor | A measured, reproducible quality gap against frontier on our claim schema |
+
+The two things genuinely worth engineering effort today are neither of these, and neither is
+infrastructure: **push instead of poll on the fastest feeds**, and **dedup-and-cluster before
+extraction**.
 
 ---
 
