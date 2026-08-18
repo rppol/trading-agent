@@ -207,6 +207,9 @@ tbody tr:hover { background: var(--line-2); }
 td.num, th.num { font-family: var(--mono); font-variant-numeric: tabular-nums lining-nums;
                  text-align: right; white-space: nowrap; }
 .tag {
+  /* inline-block + nowrap: as a plain inline element a two-word label wrapped and
+     the border broke into two half-boxes, one per line. */
+  display: inline-block; white-space: nowrap;
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em;
   text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--line); color: var(--muted);
 }
