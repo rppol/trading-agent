@@ -42,44 +42,110 @@ that makes everything else mean something — see §6.
 
 ---
 
-## 1a. Breadth is the viability condition, and it is an architectural mandate
+## 1a. Breadth is the viability condition, and the arithmetic is worse than it looks
 
-Everything else in this document is downstream of one piece of arithmetic.
+Everything else in this document is downstream of one calculation, and an earlier draft of it
+was too kind. Rather than assume an information coefficient, back it out of the best published
+result.
 
-Seven days of real coffee coverage, measured from our own corpus, yields **8 distinct claim
-themes** — roughly 1.1 a day, about **417 independent bets a year**. The fundamental law of
-active management gives the information ratio as `IC x sqrt(breadth) x transfer coefficient`:
+Vu, Chi & El-Jahel (2025, *Journal of Futures Markets* 45(10)) run news sentiment across **24
+commodities**, weekly, and report a post-cost Sharpe of **0.450** at t = 2.17. Through
+`IR = IC x sqrt(BR)`:
 
-| Information coefficient | Transfer | Breadth | Gross IR |
-|---|---|---:|---:|
-| 0.02 | 0.6 | 417 | 0.25 |
-| 0.03 | 0.6 | 417 | **0.37** |
-| 0.05 | 0.6 | 417 | 0.61 |
-| 0.08 | 1.0 | 417 | 0.98 |
+```
+BR  = 24 commodities x 52 weeks = 1,248 bets/year
+IC  = 0.450 / sqrt(1,248)       = 0.0127
+```
 
-Even at an implausibly good IC of 0.08 with frictionless implementation, **coffee alone tops
-out near 1.0 gross, before transaction costs**. At a realistic 0.03 it is 0.37 — a marginal
-sleeve, not a business.
+**So the implied per-bet IC of a real commodity news signal is 0.013–0.018** — below the bottom
+of the range usually called a credible factor. Apply it to one commodity:
 
-Inverting it, to reach a defensible IR of 1.5 you need roughly **6 comparable commodities at
-IC 0.05, or 17 at IC 0.03.**
+| Configuration | Breadth | Gross IR |
+|---|---:|---:|
+| Coffee, weekly | 52 | **0.09 – 0.13** |
+| Coffee, daily | 252 | **0.20 – 0.29** |
+| Coffee, daily, transfer coefficient 0.6 | 252 | **0.12 – 0.17** |
 
-**So commodity plurality is not a roadmap item. It is the condition under which the system is
-worth building at all**, and it converts directly into an engineering requirement:
+Then subtract costs. A Coffee C contract is 37,500 lb, one tick is $18.75 — about 1.7 bps at
+300 c/lb — so an all-in round trip is roughly **5–9 bps**. Against ~30% annualised coffee
+volatility:
+
+| Rebalance | Round trips/yr | Sharpe drag |
+|---|---:|---:|
+| Daily | 252 | **0.58** |
+| Weekly | 52 | 0.12 |
+| Monthly | 12 | 0.03 |
+
+**A daily-rebalanced coffee-only news strategy is negative net of costs by a factor of two to
+six. A weekly one is a rounding error above zero.** That is closed-form arithmetic available
+before any model is trained.
+
+**Breadth counts decisions, not documents.** This is the part most easily got wrong. Trading one
+contract on a daily signal gives 252 bets a year whether 20 documents arrive daily or 20,000.
+More documents on the *same* commodity raise the precision of one forecast — they move IC toward
+a ceiling — they do not add bets. And the gain is sub-linear: 20 documents a day that are really
+three wire originals recycled by five outlets contribute about `sqrt(3)`, not `sqrt(20)`.
+
+Inverting for a shippable IR of 0.5 at IC 0.0127 gives **~1,550 bets/year — roughly 30
+independent commodities at weekly rebalance.** Going from 1 commodity to 20 multiplies IR by
+`sqrt(20)` = **4.5x**. Tripling coffee document volume multiplies it by well under 1.2x.
+
+> **Adding the twenty-first commodity is worth more than tripling coffee coverage, and it is
+> cheaper — the extraction schema is already commodity-generic.**
+
+So commodity plurality is not a roadmap item. It is the condition under which the system is
+worth building, and it converts into one engineering requirement:
 
 > The marginal cost of commodity N+1 must be near zero.
 
-Which means nothing may be hardcoded to coffee. The relevance lexicon, the origin-region
-taxonomy, the driver enumeration, the entity graph and the extraction prompt are all **data,
-not code** — parameterised per commodity and versioned alongside it. Adding wheat should be a
-configuration row and a lexicon, not a pull request against the pipeline.
+Nothing may be hardcoded to coffee. The relevance lexicon, origin taxonomy, driver enumeration,
+entity graph and extraction prompt are **data, not code** — parameterised per commodity and
+versioned alongside it. Adding wheat should be a configuration row, not a pull request against
+the pipeline. Cheap now, expensive to retrofit; the same asymmetry as the two clocks in §3.
 
-This is cheap to honour on day one and expensive to retrofit, which puts it in the same
-category as the two clocks in §3: a decision whose cost is asymmetric in time.
+The prototype here is deliberately coffee-only because the brief asked for one end-to-end slice.
+Where it hardcodes coffee, that is a shortcut with a stated ceiling, marked as such in the code.
 
-The prototype in this repository is deliberately coffee-only, because the brief asked for one
-end-to-end slice. Where it hardcodes coffee, that is a shortcut with a known ceiling and it is
-marked as such in the code.
+---
+
+## 1b. What the evidence says about the signals themselves
+
+Three findings from the literature contradict design decisions taken earlier in this document.
+They are recorded here rather than quietly reconciled.
+
+**Novelty weighting is backwards.** Chi, El-Jahel & Vu (2024, *Energy Economics* 140) study news
+sentiment across 13 commodity futures **including Coffee C**, over 2003–2021. Their result: a
+one-standard-deviation move in *novel* news sentiment shifts the **same-day** return by 0.08%,
+and has **no significant lagged effect at all** — "information is quickly incorporated into the
+price." The *old*, repeated news component carries the only measurable multi-day dynamic, and
+that dynamic is a **reversal**.
+
+Our aggregation up-weights novelty. On this evidence that selects the component with no
+forecastable content and discards the one with a measurable (contrarian) signal. This is a
+one-parameter sweep on existing code — run the identical pipeline at novelty weights of +1, 0
+and −1 and compare information coefficients on the same purged folds — and it should be run
+before any further work on extraction quality.
+
+**The futures basis probably subsumes `supply_risk`.** Gorton, Hayashi & Rouwenhorst (2013)
+establish that the convenience yield is a decreasing non-linear function of inventories, and
+that the futures basis, prior returns and spot volatility already "reflect the state of
+inventories." The front-to-second spread is free, real-time and market-cleared. Our text
+pipeline is an expensive, lagged, noisy estimator of the same latent variable.
+
+**If `supply_risk` shows no incremental explanatory power over the basis, it is not a signal —
+it is a slow proxy.** That regression costs an afternoon and belongs in week one, ahead of
+everything else in this document.
+
+**`policy_shock` cannot be validated and should be demoted.** Materially damaging Brazil frosts
+occur roughly once every 5–10 years; coffee-relevant policy shocks a handful per decade.
+Effective sample size is single digits, and no statistical test rescues n = 6. Brandt & Gao
+(2019) find geopolitical news has strong immediate impact and **no predictability** — the profile
+of something you defend against rather than bet on.
+
+So `policy_shock` becomes a **risk filter, not a directional signal**: flatten or halve size on a
+detected discontinuity, do not trade its direction. A risk filter needs no statistical validation
+to earn its place; a directional signal with n = 6 can never earn one. The reframing costs
+nothing and removes an untestable claim from the product.
 
 ---
 
@@ -504,17 +570,21 @@ missing data.
 
 ## 9. Evaluation, retraining, and the contamination nobody mentions
 
-**A current LLM already knows how the 2024 Brazil drought resolved.** Research on
-chronologically consistent models measures standard LLMs at 65–70% accuracy predicting price
-moves from historical text, against 50–55% for era-matched models. That 10–15 point gap is
-not skill. It is memory of the future, and it is roughly the entire apparent alpha of a
-naive news backtest.
+Two published results are worth naming for how they fail. One reports 50.63% returns over 28
+months from news sentiment and **never mentions transaction costs or slippage**. Another reports
+a **Sharpe ratio of 5.87** on EUR/USD from GDELT sentiment — from free, public data anyone can
+download. A Sharpe near 6 over five years implies a t-statistic around 13; nothing in the FX
+literature is within an order of magnitude. Real macro strategies live between 0.5 and 1.5. That
+number is a bug report, not a result.
 
-Two published results make the point concrete. One reports 50.63% returns over 28 months from
-news sentiment and **never mentions transaction costs or slippage**. Another reports a
-**Sharpe ratio of 5.87** on EUR/USD from GDELT sentiment — from free, public data that
-anyone can download. Real macro strategies live between 0.5 and 1.5. A Sharpe near 6 is a
-bug report, not a result.
+An earlier draft of this document also asserted that pretraining contamination accounts for
+roughly the entire apparent alpha of a news backtest, citing a 65–70% versus 50–55% accuracy
+gap. **That claim was wrong and has been retracted** — the source concludes that lookahead bias
+is "modest." The retraction and what produced it are the first entry in
+[FAILURE_MODES.md](FAILURE_MODES.md), because the mechanism is more interesting than the claim
+was. Contamination is real enough to control for and small enough that it must be **measured
+rather than assumed**: mask entities, dates and price levels in extraction, and run the backtest
+against an era-matched model to size the gap instead of asserting it.
 
 Controls, in order of how much they cost to add:
 
@@ -573,20 +643,74 @@ breaks loudly.
 
 ---
 
-## 10. Staging: what to build first
+## 10. Staging, and the two weeks that should come before all of it
 
-This matters more than the diagram. The full architecture above is a destination, and
-building it before there is a signal worth serving is the most common way these platforms die.
+The full architecture above is a destination. Building it before establishing that there is a
+signal worth serving is the most common way these platforms die, so the staging plan starts with
+four cheap tests that can end the project.
+
+### Stage 0 — the kill battery. Under two weeks, no modelling, no archive
+
+Run in this order. Each can terminate the effort on its own.
+
+| # | Test | Kill if | Cost |
+|---|---|---|---|
+| **K1** | **Latency.** What fraction of the total price move around an event happens between publication and our `ingest_time`? | ≥60% of the move is already gone before we see it | 3 days |
+| **K2** | **Contemporaneous power.** Does today's claim aggregate explain *today's* return? | R² indistinguishable from zero | 3 days |
+| **K3** | **Reverse causality.** Bidirectional Granger between claim flow and returns | returns → claims dominates | 2 days |
+| **K4** | **Effective breadth.** Documents per day *after* near-duplicate clustering | fewer than 5 genuinely independent documents/day | 2 days |
+
+**Most news pipelines die at K2** — they cannot explain the same day's return, let alone
+tomorrow's. K3 matters more than it sounds: media pessimism is known to *follow* low returns, so
+an accumulating supply-risk score can be a laundered momentum signal that backtests beautifully
+for exactly the wrong reason.
+
+Then, before any further extraction work:
+
+| # | Test | Kill if |
+|---|---|---|
+| **K5** | Incremental explanatory power of `supply_risk` **over the futures basis**, out of sample | p > 0.10 |
+| **K6** | Realised Sharpe against a **permutation null** — identical pipeline, claim polarities shuffled within date | realised ≤ 95th percentile of the shuffled distribution |
+| **K7** | Net Sharpe after the transaction costs in §1a, purged out-of-sample | < 0.30 |
+
+K6 is the one that validates the *whole apparatus* — backtester, cost model and all — rather
+than the signal alone. A pipeline that produces an attractive Sharpe on shuffled polarities has
+a bug, not an edge.
+
+### If the battery passes
 
 | Stage | Build | Deliberately skip |
 |---|---|---|
-| **Month 1** | Bulk news ingest, bitemporal store, claim extraction with span gate, one commodity, a read API, the leakage test | Streaming, feature store, imagery, retraining |
-| **Month 3** | Positioning + inventory regime state, calibration against forward returns, golden set + prompt CI gate, AIS for one trade lane | Satellite tasking, multi-region, custom models |
-| **Month 12** | Imagery on triggered AOIs, cross-modal corroboration, conformal intervals, champion/challenger, cost governor | Anything with no measured IC |
+| **Month 1** | Bulk news ingest, bitemporal store, claim extraction with the span gate, read API, leakage test | Streaming, feature store, imagery, retraining |
+| **Month 3** | **Commodity 2 through 10** — breadth before depth, every time. Regime state, calibration against forward returns, golden set and prompt CI gate | Satellite tasking, multi-region, custom models |
+| **Month 12** | Imagery on triggered AOIs, cross-modal corroboration, conformal intervals, champion/challenger | Anything with no measured information coefficient |
 
-The gate between stages is not a date, it is evidence: **do not build stage N+1 until stage N
-has a signal with measurable, cost-surviving information coefficient.** A platform with
-excellent infrastructure and no edge is a more expensive failure than a spreadsheet.
+The gate between stages is evidence, not a date: **do not build stage N+1 until stage N has a
+signal with measurable, cost-surviving information coefficient.** A platform with excellent
+infrastructure and no edge is a more expensive failure than a spreadsheet.
+
+### And the likelier product, stated plainly
+
+At the information coefficient the literature actually supports, a coffee-only signal needs
+roughly **460 years** of forward data to separate from zero. Twenty-four commodities brings that
+to about **19 years** — which is precisely why the published study needed 2003–2021. Forward
+testing is arithmetically hopeless; only a point-in-time news **archive** buys enough calendar
+time to decide this decade, which makes archive acquisition the critical path, ahead of
+extraction quality.
+
+So there are two honest products here, and the second is more likely:
+
+1. **A trading signal**, which requires 20–40 commodities and a decade of archive. Coffee alone
+   mathematically cannot prove the concept, so a coffee pilot cannot be the gate for it.
+2. **Nowcasting and explanation** — *"here is why coffee moved 4% today, with citations, in 90
+   seconds."* This needs K2 to pass and nothing else on the statistical ladder. It is genuinely
+   valuable to a physical trading desk, sells on a different basis, and is the product this
+   architecture already builds.
+
+Discovering which one you have in month one is worth considerably more than discovering it in
+month eighteen.
+
+---
 
 ## 11. Technology choices, and what each replaces
 

@@ -88,7 +88,16 @@ function viewOverview() {
       <div class="stat"><b>0.4%</b><span>of cost is the LLM</span></div>
     </div>
 
-    <h2>Four things this argues</h2>
+    <h2>Five things this argues</h2>
+
+    <h3>Breadth, not depth, decides whether this works at all</h3>
+    <p>Back out the information coefficient from the best published commodity-news result and you
+    get <b>0.013</b>. Applied to one commodity that is a gross Sharpe around <b>0.1–0.3</b>, which
+    is negative after realistic futures costs. More documents about coffee raise the precision of
+    one forecast; they do not add bets. <b>Adding the twenty-first commodity is worth more than
+    tripling coffee coverage</b> — so the marginal cost of commodity N+1 must be near zero, and
+    nothing may be hardcoded to coffee.</p>
+
     <h3>The volumes in the brief are a misdirection</h3>
     <p>Ten million AIS pings a day is <b>116 messages a second</b> — one database, not a
     streaming cluster. Five hundred documents a day is about <b>nine dollars</b> of tokens.
@@ -113,6 +122,15 @@ function viewOverview() {
     thousand tonnes of coffee. Requiring text, vessel traffic and imagery to agree before a
     signal earns conviction is simultaneously the confidence model and the defence against
     planted news.</p>
+
+    <h3>The document argues against itself where the evidence does</h3>
+    <p>Three design decisions here are contradicted by the literature and are recorded as such
+    rather than quietly dropped: novelty weighting is probably <i>backwards</i>, the futures basis
+    probably subsumes the supply-risk signal, and the policy signal has too few events in a decade
+    to ever be validated. One earlier claim — that pretraining contamination accounts for most of
+    a news backtest's apparent alpha — <b>was simply wrong, and is retracted with the source
+    quoted</b>. The mechanism that produced that error is the first entry in the failure-mode
+    register.</p>
 
     <h2>What is actually running</h2>
     <p>The prototype ingests GDELT's bulk 15-minute knowledge-graph batches, collapses

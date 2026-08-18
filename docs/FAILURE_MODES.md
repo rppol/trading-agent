@@ -8,27 +8,52 @@ Each entry: **mechanism → detection → mitigation.**
 
 ---
 
-## 1. The LLM has already read the future
+## 1. Trusting a model's summary of the evidence — including our own
 
-**Mechanism.** A current model knows how the 2024 Brazil drought resolved, which tariffs
-survived, and where prices went. Ask it to score a 2024 article and it is not inferring, it
-is recalling. Research on chronologically consistent models measures standard LLMs at
-**65–70%** accuracy predicting price direction from historical text versus **50–55%** for
-era-matched models. The gap is not skill.
+**This entry began as a different claim, and correcting it is the most instructive thing in
+this document.**
 
-**Why it is the worst one.** Every other leakage bug is a coding error you can find by
-reading the query. This one lives in the model weights, produces beautiful backtests, is
-invisible to code review, and disappears the moment you trade it.
+An earlier draft asserted that research on chronologically consistent language models measured
+standard LLMs at 65–70% accuracy predicting price direction from historical text against 50–55%
+for era-matched models, and concluded that roughly the entire apparent alpha of a news backtest
+is pretraining contamination.
 
-**Detection.** Run the identical backtest twice — once with the production model, once with a
-model whose knowledge cutoff precedes the test window. A large IC gap between them *is* the
-contamination, quantified. Also: performance that improves as you go further back in time is
-diagnostic, since genuine edge decays backwards, memory does not.
+**That figure was wrong.** It came from a summarising model's reading of the paper, not from the
+paper. The abstract of He, Lv, Manela & Wu (2025), [arXiv:2502.21206](https://arxiv.org/abs/2502.21206),
+says the opposite, verbatim:
 
-**Mitigation.** Era-matched models for historical evaluation. Where that is impractical,
-restrict historical claims to *extraction quality* — did it find the right facts — and refuse
-to claim predictive power from any backtest a contaminated model touched. Forward paper
-trading is the only clean read.
+> "In an asset pricing application predicting next-day stock returns from financial news, we
+> find that ChronoBERT and ChronoGPT's real-time outputs achieve Sharpe ratios comparable to a
+> much larger Llama model, **indicating that lookahead bias is modest**."
+
+The same paper stresses that lookahead bias is "model and application-specific."
+
+**Why this belongs in a failure-mode register rather than a quiet edit.** The mechanism that
+produced the error is exactly the one this system exists to defeat: an unverified paraphrase
+from a language model was promoted to a load-bearing conclusion and propagated into two
+documents. The verbatim-span gate in the pipeline exists because a model's summary is not
+evidence. That standard was applied to the pipeline's inputs and not to its authors.
+
+**The generalised failure.** Anywhere a model summarises a source and a human acts on the
+summary without opening the source, you have an unaudited claim. It is invisible because the
+summary is fluent, plausible, and directionally reasonable — this one was all three, and it
+supported a conclusion that felt sophisticated.
+
+**Detection.** Every quantitative claim in a research artefact carries a citation, and a
+citation means a quotation that can be checked, not a link that gestures at a paper. Spot-check
+a random sample against primary sources. A claim whose number cannot be found in the cited
+document is treated exactly as the pipeline treats an ungrounded extraction: rejected.
+
+**Mitigation, and what the real risk is.** Contamination is a **hypothesis to test, not a
+quantity to assume**. Glasserman & Lin ([arXiv:2309.17322](https://arxiv.org/abs/2309.17322))
+do document both a look-ahead bias and a *distraction* effect from named entities in model
+sentiment over 181,908 Reuters headlines, and find that anonymising company identifiers can
+improve performance. So the controls are cheap and worth adopting regardless of effect size:
+
+- **Mask entity names, dates and price levels** in the extraction prompt. If extraction quality
+  depends on the model recognising *which* drought this was, that dependence is measurable.
+- **Run the backtest twice** — once with the production model, once era-matched — and report the
+  gap as a measured quantity rather than asserting it.
 
 ---
 
