@@ -58,8 +58,11 @@ body {
   font-size: 18px;
   line-height: 1.62;
   font-variant-numeric: oldstyle-nums;
-  transition: background .35s ease, color .35s ease;
 }
+/* No colour transition on the surface swap. body's background animated while
+   .card/.panel read var(--panel) and flipped instantly, so for ~350ms the page
+   was a dark ground carrying light panels with unreadable text. The two surfaces
+   invert wholesale; they should switch in the same frame. */
 
 /* ---------------------------------------------------------------- masthead */
 
