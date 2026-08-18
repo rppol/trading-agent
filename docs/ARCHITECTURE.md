@@ -10,6 +10,96 @@ the measurement won and the contradiction is noted.
 
 ---
 
+## 0. The measurement that reframes the brief
+
+The assignment says to ingest news from GDELT. We did, and then measured what arrived.
+**675,840 documents across 8,383 distinct domains over seven days**, from the raw 15-minute
+knowledge-graph batches:
+
+| Source that actually moves coffee | Documents in 7 days |
+|---|---:|
+| **Reuters** | **0** |
+| **Cecafé** (Brazilian exporters council) | **0** |
+| **Conab** (Brazilian crop agency) | **0** |
+| **ICO** (International Coffee Organization) | **0** |
+| Comunicaffe, Perfect Daily Grind, World Coffee Portal | 0 |
+| Barchart, StoneX, Platts, Hedgepoint, Volcafe, Sucafina | 0 |
+| Notícias Agrícolas, Globo Rural, Valor | 0 |
+| Bloomberg | 189 |
+| Argus Media | 39 |
+| Fastmarkets | 15 |
+| Daily Coffee News | 11 |
+
+And what *is* there:
+
+| Top domains in the same corpus | Share |
+|---|---:|
+| `iheart.com` — a radio syndication network | **7.8%** (52,439 docs) |
+| `indiatimes.com` | 1.4% |
+| `yahoo.com` | 1.2% |
+| `boredpanda.com` | 0.5% |
+
+**So the ~20 "tradeable" coffee documents a day this pipeline surfaces are not thin signal.
+They are the false-positive floor.** The wires, the trade press and the primary institutions
+that actually move the Coffee C contract are not in the corpus at all.
+
+**This is an acquisition problem wearing the costume of an NLP problem.** No improvement to
+filtering, extraction, prompting or model choice can recover information that was never
+ingested. A team that spends six months on extraction quality here will get better and better
+at reading documents that do not contain the answer.
+
+GDELT is a general-purpose global crawler weighted toward local affiliates and syndication
+networks. It is genuinely good at what it was built for — civil unrest, protest, conflict — and
+that has real value for coffee as an **origin-country tripwire**: Colombian roadblocks,
+Ethiopian conflict, Vietnamese policy protest. It is not a market data source, and the honest
+architecture demotes it to the tripwire role.
+
+### What the acquisition layer should be instead
+
+Almost all of it is free, and most of it *precedes* the news rather than following it.
+
+| Source | Cadence | Access | Cost |
+|---|---|---|---|
+| **ICE certified arabica stocks** | Daily | Deterministic public URL, no auth — `coffee_cert_stock_YYYYMMDD.xls` | **Free** |
+| **CFTC Commitments of Traders** | Weekly, Fri 15:30 ET | Socrata JSON API, no token | **Free** |
+| **ECMWF open data** | 4 runs/day | `ecmwf-opendata`, CC-BY-4.0 since Oct 2025 | **Free** |
+| **NOAA GFS** | 4 runs/day | S3, no account needed | **Free** |
+| **Cecafé / Conab / USDA FAS / ICO** | Scheduled | Web, PDF, some APIs | **Free** |
+| Dow Jones CommodityWire | Real-time | API | ~$165/mo |
+| StoneX Coffee Essential (Brazil frost/rainfall) | Daily, pre-market | Portal | ~$51–60/mo |
+
+**The fastest genuinely actionable coffee information is not a news feed at all.** It is a
+weather model run — free, four times a day, hours before any journalist writes anything — and,
+at the extreme, a Brazilian producer photographing frost on their own farm at dawn. The wire
+services sit between those two and cost tens of thousands a year. The trade press sits behind
+the wires. GDELT sits behind the trade press and does not index it.
+
+### The second measurement: our own clock was wrong
+
+GDELT's filename is a **forward-dated window label, not a data-as-of mark.** Measured across
+consecutive batches:
+
+| Filename label | Actually written | Delta |
+|---|---|---|
+| `20260818183000` | 18:20:11 | **−9.8 min** |
+| `20260818181500` | 18:05:03 | −9.9 min |
+| `20260818180000` | 17:50:31 | −9.5 min |
+| `20260818174500` | 17:35:13 | −9.8 min |
+
+Two consequences, and this pipeline had both bugs until it was measured:
+
+1. **`ingest_time` must come from the HTTP `Last-Modified`, not the filename**, or every
+   document is forward-dated by ten minutes. In a backtest that error is *conservative* — it
+   hides information you genuinely had — but it is still a wrong column, and it silently
+   corrupts any latency metric computed from it later.
+2. **Polling `lastupdate.txt` beats firing on the quarter hour by those same ten minutes**, for
+   free. That is a larger latency win than anything in the compute path (§7), and it is a cron
+   change.
+
+Both are now fixed in `signals/pipeline.py`.
+
+---
+
 ## 1. The brief's numbers are a misdirection, and saying so is the answer
 
 The volumes in the brief look large. Most of them are not. Sizing them honestly is the first

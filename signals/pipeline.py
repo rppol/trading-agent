@@ -76,6 +76,29 @@ ORIGINS = {"BR": "BR_MG", "VM": "VN_CENTRAL_HIGHLANDS", "CO": "CO", "ET": "ET",
 CACHE = pathlib.Path(__file__).resolve().parent.parent / "data" / "gkg_cache"
 
 
+def _batch_published(url: str) -> str | None:
+    """GDELT's filename is a forward-dated WINDOW LABEL, not a data-as-of mark.
+    Measured across consecutive batches, the file labelled 18:30:00 is actually
+    written at 18:20:11 -- the label runs ~10 minutes ahead, consistently.
+
+    Two consequences. The honest ingest_time is the HTTP Last-Modified, not the
+    filename, or every document is forward-dated by ten minutes and any latency
+    metric computed later is wrong. And polling lastupdate.txt beats firing on
+    the quarter hour by those same ten minutes, for free.
+    """
+    try:
+        req = urllib.request.Request(url, method="HEAD",
+                                     headers={"User-Agent": "trading-agent/0.1"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            lm = r.headers.get("Last-Modified")
+        if not lm:
+            return None
+        return datetime.strptime(lm, "%a, %d %b %Y %H:%M:%S %Z").replace(
+            tzinfo=timezone.utc).isoformat(timespec="seconds")
+    except Exception:
+        return None
+
+
 def _fetch_bytes(url: str, tries: int = 3) -> bytes | None:
     """Cached on disk. GDELT batches are immutable once published, so caching is
     not an optimisation -- it is what makes a rerun reproduce the same corpus."""
@@ -156,7 +179,7 @@ def _region(locations: str) -> str:
     return "GLOBAL"
 
 
-def parse_batch(blob: bytes, stamp: str) -> list[dict]:
+def parse_batch(blob: bytes, stamp: str, published: str | None = None) -> list[dict]:
     import io, zipfile
     try:
         z = zipfile.ZipFile(io.BytesIO(blob))
@@ -164,7 +187,9 @@ def parse_batch(blob: bytes, stamp: str) -> list[dict]:
         return []
     name = z.namelist()[0]
     text = z.read(name).decode("utf-8", "replace")
-    ingest = datetime.strptime(stamp, "%Y%m%d%H%M%S").replace(
+    # Prefer the measured publication time; fall back to the label only if the
+    # HEAD failed. Never silently use the label as if it were the truth.
+    ingest = published or datetime.strptime(stamp, "%Y%m%d%H%M%S").replace(
         tzinfo=timezone.utc).isoformat(timespec="seconds")
     out = []
     for line in text.splitlines():
@@ -201,8 +226,9 @@ def parse_batch(blob: bytes, stamp: str) -> list[dict]:
             "source_country": _region(row[C_LOCATIONS] if len(row) > C_LOCATIONS else ""),
             "snippet": evidence,
             "event_time": et,
-            # ingest_time is the BATCH stamp, not wall clock. That is what makes
-            # a replay reproducible: rerunning tomorrow yields the same second clock.
+            # ingest_time is the batch's measured publication time, not wall
+            # clock -- so a rerun reconstructs the same second clock rather than
+            # stamping everything "now".
             "ingest_time": ingest,
             "raw": {"gkg_id": row[C_ID], "themes": row[C_THEMES][:600],
                     "tone": _tone(row[C_TONE] if len(row) > C_TONE else ""),
@@ -219,10 +245,11 @@ def fetch(n_batches: int = 24, **_) -> list[dict]:
     docs: dict[str, dict] = {}
     stamps = batch_stamps(n_batches)
     for i, st in enumerate(stamps):
-        blob = _fetch_bytes(f"{GKG_BASE}{st}.gkg.csv.zip")
+        url = f"{GKG_BASE}{st}.gkg.csv.zip"
+        blob = _fetch_bytes(url)
         if not blob:
             continue
-        got = parse_batch(blob, st)
+        got = parse_batch(blob, st, _batch_published(url))
         for d in got:
             docs.setdefault(d["url"], d)
         print(f"  batch {i+1}/{len(stamps)} {st}: +{len(got)} (total {len(docs)})",

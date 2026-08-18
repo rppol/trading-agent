@@ -88,6 +88,20 @@ function viewOverview() {
       <div class="stat"><b>0.4%</b><span>of cost is the LLM</span></div>
     </div>
 
+    <h2>The finding that reframes the brief</h2>
+    <p>The assignment says to ingest news from GDELT. We did, then measured what arrived —
+    <b>675,840 documents across 8,383 domains in seven days</b>. Reuters: <b>zero</b>. Cecafé,
+    Conab, the International Coffee Organization, and every coffee trade publication: <b>zero</b>.
+    Meanwhile a radio syndication network supplies <b>7.8%</b> of the corpus and boredpanda.com
+    is a top-ten source.</p>
+    <p>So the ~20 tradeable coffee documents a day this pipeline surfaces are not thin signal —
+    <b>they are the false-positive floor</b>. This is an acquisition problem wearing the costume
+    of an NLP problem, and no amount of extraction quality recovers information that was never
+    ingested. The honest architecture demotes GDELT to what it is genuinely good at — an
+    origin-country unrest tripwire — and rebuilds acquisition around ICE certified stocks, CFTC
+    positioning and weather model runs, nearly all of which are free and most of which
+    <i>precede</i> the news rather than follow it.</p>
+
     <h2>Five things this argues</h2>
 
     <h3>Breadth, not depth, decides whether this works at all</h3>
