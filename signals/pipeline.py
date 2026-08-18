@@ -38,6 +38,12 @@ C_ID, C_DATE, C_DOMAIN, C_URL = 0, 1, 3, 4
 C_THEMES, C_LOCATIONS, C_ORGS, C_TONE = 7, 9, 13, 15
 C_QUOTES, C_NAMES, C_AMOUNTS, C_TRANS, C_XTRA = 22, 23, 24, 25, 26
 
+# ponytail: coffee-only lexicon, hardcoded. The breadth arithmetic in
+# docs/ARCHITECTURE.md 1a says a single commodity cannot support a book -- these
+# three patterns plus ORIGINS and the driver enum must become per-commodity DATA
+# (a config row + lexicon) before a second commodity is added. Cheap now,
+# expensive once anything reads them positionally.
+#
 # The commodity, not the beverage and not the furniture. Earlier versions matched
 # the URL and entity list, so "coffee table" and "coffee shop" qualified; and an
 # unbounded MARKET matched "price" in "Argos cuts bistro set to half price".

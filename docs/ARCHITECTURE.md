@@ -42,6 +42,47 @@ that makes everything else mean something — see §6.
 
 ---
 
+## 1a. Breadth is the viability condition, and it is an architectural mandate
+
+Everything else in this document is downstream of one piece of arithmetic.
+
+Seven days of real coffee coverage, measured from our own corpus, yields **8 distinct claim
+themes** — roughly 1.1 a day, about **417 independent bets a year**. The fundamental law of
+active management gives the information ratio as `IC x sqrt(breadth) x transfer coefficient`:
+
+| Information coefficient | Transfer | Breadth | Gross IR |
+|---|---|---:|---:|
+| 0.02 | 0.6 | 417 | 0.25 |
+| 0.03 | 0.6 | 417 | **0.37** |
+| 0.05 | 0.6 | 417 | 0.61 |
+| 0.08 | 1.0 | 417 | 0.98 |
+
+Even at an implausibly good IC of 0.08 with frictionless implementation, **coffee alone tops
+out near 1.0 gross, before transaction costs**. At a realistic 0.03 it is 0.37 — a marginal
+sleeve, not a business.
+
+Inverting it, to reach a defensible IR of 1.5 you need roughly **6 comparable commodities at
+IC 0.05, or 17 at IC 0.03.**
+
+**So commodity plurality is not a roadmap item. It is the condition under which the system is
+worth building at all**, and it converts directly into an engineering requirement:
+
+> The marginal cost of commodity N+1 must be near zero.
+
+Which means nothing may be hardcoded to coffee. The relevance lexicon, the origin-region
+taxonomy, the driver enumeration, the entity graph and the extraction prompt are all **data,
+not code** — parameterised per commodity and versioned alongside it. Adding wheat should be a
+configuration row and a lexicon, not a pull request against the pipeline.
+
+This is cheap to honour on day one and expensive to retrofit, which puts it in the same
+category as the two clocks in §3: a decision whose cost is asymmetric in time.
+
+The prototype in this repository is deliberately coffee-only, because the brief asked for one
+end-to-end slice. Where it hardcodes coffee, that is a shortcut with a known ceiling and it is
+marked as such in the code.
+
+---
+
 ## 2. The load-bearing decision: extraction is not prediction
 
 The obvious build is: news in, trading signal out, one model. It fails three ways at once.
