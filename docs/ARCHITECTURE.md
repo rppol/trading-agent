@@ -247,6 +247,27 @@ flowchart LR
     class C store
 ```
 
+### Two traps in this stage
+
+**Sentiment is inverted for supply shocks, so do not use it.** GDELT ships a document-level
+tone vector for free, and it is tempting. But a frost story is strongly *negative* in tone and
+strongly *bullish* on price. Wire tone to a directional signal and you invert roughly half your
+calls. The same objection retires FinBERT and its descendants here — they are calibrated on
+equity news, where bad news for a company is bad for its price. Agricultural supply does not
+work that way. Direction must be a property of the **extracted claim**, asserted against a
+signed supply-direction vocabulary (`frost`, `leaf rust`, `export ban`, `stocks drawdown` →
+supply-negative → price-up), never a property of the prose.
+
+**Near-duplicate matching fails across languages, and that is the main path, not an edge
+case.** A Portuguese and an English article about the same Minas Gerais frost share almost no
+character shingles, so Jaccard sees two unrelated documents. But they share the region code,
+the event type and the figure. So the dedup ladder must fall through to an **entity-overlap
+test** — two documents sharing at least two of {canonical organisation, admin region, normalised
+amount, event type} within 48 hours join the same cluster regardless of language. This matters
+more than it sounds: Brazilian, Vietnamese and Colombian outlets break their own stories in
+Portuguese, Vietnamese and Spanish hours before the English wires pick them up, and that gap is
+precisely the window worth having.
+
 **Novelty is a signal input, not a preprocessing step.** The market prices a story on first
 print. The fortieth syndication carries no information, and counting reprints as independent
 evidence builds a signal that tracks press-release volume instead of the market. In the

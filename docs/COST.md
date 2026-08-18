@@ -92,15 +92,37 @@ continuous baseline; commercial tasking fires only when a news or AIS signal say
 AOI matters this week. Roughly thirty tasking events a month instead of daily blanket
 coverage.
 
-**Text: the cheap filter, not the cheap model.** Measured on live GKG batches, a word-bounded
-keyword filter removes **85% of coffee-mentioning documents** before any model runs — café
-openings, campus promotions, a stag shot in a park. The remaining cascade stage sends ~95% of
-survivors to a small model. Together these mean the frontier model sees a couple of dozen
-documents a day.
+**Text: the cascade is not a cost lever, and treating it as one leads you astray.**
+This is worth stating carefully because the intuitive framing is wrong. Running a frontier
+model over *every* raw GKG record would cost roughly $170–860/day. Running it only on the
+market-relevant survivors costs about **$1.08/day**. The saving is real, but at this scale
+neither number threatens the budget, so cost is not why the cascade exists.
 
-**Tokens: the prompt is a fixed prefix.** The extraction prompt is long and identical across
-documents, which is close to the ideal case for prompt caching (up to ~90% off the cached
-portion) stacked with batch pricing (~50%). The variable part is a short snippet.
+The cascade exists for three other reasons:
+
+- **Reproducibility.** A filter decision made by a language model is not replayable. Re-run
+  the backtest and you are drawing fresh samples from a distribution you do not control, on
+  weights that change under you. Anything whose output must be byte-identical on re-run must
+  not be a model.
+- **Auditability.** "The model thought it was relevant" is not an answer to a client asking
+  why you were long on 14 March. A theme code, a region, a cited figure and three corroborating
+  domains is.
+- **Blast radius.** 150k model calls a day is a sustained dependency with retries, rate limits
+  and a provider outage as a single point of failure. Two dozen calls fails safe.
+
+**Which inverts the obvious recommendation: widen the model gate, do not narrow it.** Sending
+all ~163 coffee-mentioning documents to extraction rather than only the ~24 that pass the
+market filter costs about **$2,700/year**. That is recall insurance, and one missed frost story
+costs more than the premium. Spend what the cascade saved on more coverage, not less.
+
+**Tokens: prompt caching does not help us, and I initially assumed it would.** The extraction
+prompt is a long fixed prefix, which is textbook caching territory — but our calls are fifteen
+minutes or more apart. The five-minute cache never hits, and the one-hour cache costs double on
+write for roughly 24 writes serving 140 reads. Net effect is noise. It becomes worth enabling
+once coverage widens to many commodities and calls become continuous, or if each batch window
+is fired as one burst. The **batch tier (~50%)** does apply, and matters most for archive
+backfill: five years of coffee history is ~297k documents, about **$6,700 one-off** — the
+cheapest moat available here.
 
 **Inference: rent until you are large.** A dedicated GPU beats API pricing somewhere above
 roughly 20M tokens/day. This workload is two orders of magnitude below that. Self-hosting

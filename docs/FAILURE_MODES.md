@@ -129,6 +129,72 @@ unavailable, the signal must *widen its interval*, not quietly hold its last val
 
 ---
 
+## 6. Surprise treated as strength, instead of as a reason to look harder
+
+**Mechanism.** A claim far from the running consensus — a crop estimate five standard
+deviations below every other forecast — is the most informative thing in the stream *if true*.
+The natural implementation weights it heavily. That is also precisely the shape of a fabricated
+number, and a system that scales conviction with surprise is a system that can be farmed: get
+one outlier number into one syndicated feed and the signal moves for you.
+
+**Detection.** Robust distance from the trailing consensus for that metric, region and crop
+year, using **median and median-absolute-deviation, never mean and standard deviation** — news
+figures are heavy-tailed and a single outlier poisons a mean-based baseline exactly when you
+need it.
+
+**Mitigation.** Invert the reflex: **high surprise raises review priority, not confidence.** An
+outlier is held as provisional and requires corroboration from an independent owner group
+before it can move a signal. This costs latency on genuine scoops, which is the correct trade —
+the scoop is still captured, just a few hours later and with its evidence attached.
+
+---
+
+## 7. Cluster history rewritten on merge
+
+**Mechanism.** Two document clusters look distinct on Monday. On Wednesday a new article
+bridges them and they are genuinely one story. The obvious implementation updates the earlier
+rows to the surviving cluster id. Every backtest that replays Monday now sees one cluster —
+which is not what was known on Monday. Cluster size feeds novelty, corroboration count and
+confidence, so the contamination propagates into every signal that depends on them.
+
+**Why it is nasty.** It is invisible. The data is more *correct* after the merge, the code
+reads as a tidy-up, and no test fails. It is a lookahead bug wearing the clothes of a bug fix.
+
+**Detection.** Assert that no historical replay ever returns fewer clusters than an earlier
+replay over the same window — the same monotonicity property the leakage test already asserts
+for claims.
+
+**Mitigation.** Never update membership. Append a merge record carrying its own `ingest_time`
+and resolve cluster identity at read time, filtered by the same clock as everything else. The
+merge becomes a fact you learned on Wednesday rather than a retroactive correction to Monday.
+
+---
+
+## 8. Believing you can spot a fabrication at first sight
+
+**Mechanism.** The temptation is a credibility model that scores an unsourced single-source
+claim at t=0. **From the text alone, at first sighting, you cannot reliably distinguish a
+genuine exclusive from a fabrication.** Both are single-sourced, both are surprising, and both
+read as confident prose. A system that claims otherwise has encoded a guess as a score.
+
+**Detection and mitigation — make it observable over time instead.**
+
+- **Structural, not judgemental, features.** Whether the claim carries a named speaker whose
+  organisation resolves, and whether that organisation is an official statistical source, are
+  facts about the document, not opinions about its truth. A checkable claim is a different
+  object from an unsourced assertion.
+- **A prior earned from outcomes.** Track, per source, how often its exclusives are later
+  corroborated. A previously unseen domain gets a low prior by construction rather than by
+  someone's judgement.
+- **Retroactive resolution.** When the authoritative series prints, score every prior claim
+  against it and credit or debit the originating source. After a year this is an empirical
+  liar-detector that no amount of first-sighting text analysis can approximate.
+- **A policy, not an algorithm, at the boundary:** never emit a tradeable signal from a single
+  uncorroborated source. Publish it as provisional with a visible corroboration state, and
+  promote it when an independent owner group confirms.
+
+---
+
 ## The rest, in short
 
 Real, and each would hurt — but none is peculiar to this system.
