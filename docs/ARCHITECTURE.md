@@ -271,6 +271,13 @@ flowchart LR
     class E out
 ```
 
+One schema detail carries surprising weight: **put a free-text reasoning field first**, before
+any typed field. Published work attributing large accuracy losses to constrained decoding turns
+out to have measured *field ordering* — a schema that puts the answer before the rationale
+collapses chain-of-thought into direct answering. Ordering the schema so the model reasons before
+it extracts recovers essentially all of that, for a few hundred output tokens. Property order in a
+JSON schema is a quality parameter, not a stylistic one.
+
 The LLM's job is to turn prose into facts with citations. It never emits a price, a
 direction it invented, or a probability. The statistical layer owns all of that, is small
 enough to retrain nightly, and is auditable line by line.
@@ -446,6 +453,24 @@ Three controls, all cheap:
    character-for-character in the source, and any number it states appears inside that span.
    A figure the model composed fails both checks. The test suite exercises this with an
    invented "40% of its crop" that the gate rejects.
+
+   Three engineering notes, because this gate is where the design meets the API. **Normalisation
+   is most of the work** — Unicode NFKC, smart quotes to ASCII, collapsed whitespace, stripped
+   zero-width characters. Naive exact matching rejects a large fraction of *correct* quotes,
+   especially from PDF-extracted analyst notes, and that shows up as a quality problem rather
+   than a parsing one. **Store character offsets, not strings**, so provenance survives a
+   re-fetch or a re-parse. And **the rejection rate is a first-class metric** — a rising one is
+   the earliest available signal of prompt drift, a source-parser regression, or a model change.
+   Alert on the delta, not the level.
+
+   There is also a platform constraint worth knowing before designing around it: on at least one
+   major API, **native citations and strict structured output are mutually exclusive** and
+   requesting both returns an error. Native citations are otherwise strictly better than a
+   model-emitted quote — the span is extracted from the source rather than generated, so it
+   cannot be hallucinated, and it does not bill as output tokens. Until that incompatibility
+   resolves, the own-gate design here is the right default, and it must exist regardless: a
+   schema-valid, correctly-cited claim can still be semantically wrong, and no API feature
+   catches that.
 3. **Injection heuristics** set a flag, and flagged documents contribute **zero weight** to
    scoring rather than being trusted or silently dropped.
 

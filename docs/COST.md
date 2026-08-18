@@ -152,7 +152,74 @@ same fixed prompt prefix through prompt caching and the batch tier, which is whe
 
 ---
 
-## 6. Costs this model deliberately excludes
+## 6. The line that was missing entirely: derived-data licensing
+
+Everything above prices *ingesting* exchange data. None of it prices **publishing a signal
+derived from it**, and those are separate licences with a step change between them.
+
+CME's 2026 derived-data schedule is priced **per instrument per annum**:
+
+| Instruments licensed | Annual |
+|---|---:|
+| 3 | **$102,780** |
+| 5 | $171,300 |
+| 8 | **$232,860** |
+| 12 | $314,940 |
+
+That is CME alone, before ICE (~$25,000 per product per year) and LME. Against a staged
+infrastructure bill of ~$21,000/month excluding people, **this is the largest single line in the
+business and it was absent from the model.**
+
+**It is decided by product shape, not by negotiation.** Internal signal generation is already
+covered by the non-display licence — CME's Category C explicitly names "trading strategy
+development, signal processing" at $363/month per exchange. You cross into derived-data
+licensing the moment a signal is externally distributed or sold. The industry test asks two
+questions: can the output be **reverse-engineered** to recreate the source, and is it a
+**substitute** for the source?
+
+- A **daily directional score across ten commodities** passes both comfortably.
+- A **continuously-updated fair-value price per contract** fails the substitute test and probably
+  the first one too.
+
+Same pipeline, same inputs, roughly **$200,000/year apart** — and the choice is made in a design
+meeting long before anyone negotiates. Worse, if the output is classified as a "price assessment,
+curve, or analytical reference value," CME's schedule prices it as *available upon request*, with
+classification at their sole discretion. ICE's form agreement leaves both the derived-data
+definition and the scope of use as **blank templates** to be negotiated per licensee, so it
+cannot be priced from any public document.
+
+**Get quotes before fixing the product shape.**
+
+### The AI clause names this use case
+
+Effective 2027-01-01, CME's licence updates prohibit, for **website-sourced** data, inclusion in
+"any vector database, index, or knowledge base used for retrieval-augmented generation" and "use
+for the automated generation of trade signals, market analysis or sentiment indicators" — with
+an EU text-and-data-mining opt-out and stated bot countermeasures.
+
+Read the scope precisely, because both the panic and the complacency are wrong. These terms
+govern **public website data**. The same signals built on a licensed feed under the non-display
+category are permitted, at $363/month per exchange. So it is a **sourcing constraint**, and the
+realistic breach is accidental: someone writes a scraper because the licensed feed has a gap.
+
+The control is architectural and cheap — an **egress allowlist** plus a **licence-provenance tag
+on every ingested field**, so an unlicensed source cannot silently enter the pipeline. Nasdaq and
+Cboe have adopted comparable positions; ICE currently has none. No exchange publishes a
+dollar-denominated AI surcharge, which means this is a negotiation rather than a rate card.
+
+### And the delayed-data lever, which may be a trap
+
+ICE charges **nothing** for data older than 10 minutes; LME waives non-display fees for 30-minute
+delayed data. CME does not. A delayed architecture takes the exchange bill from roughly
+$43k/year to ~$13k/year, and given a minutes-latency SLO we may already qualify.
+
+But published work shows news-signal Sharpe decaying materially from T+0 to T+2. **This is the
+one place in this document where the cheap decision might be the wrong one.** Measure decay on
+our own signals before committing; be prepared for the real-time bill to be correct.
+
+---
+
+## 7. Costs this model deliberately excludes
 
 Honest omissions, each of which can dominate:
 
@@ -168,3 +235,23 @@ Honest omissions, each of which can dominate:
   $0.09/GB. That is not a running cost; it is the price of changing your mind.
 - **The cost of being wrong.** A bad signal traded at size dwarfs every line above. This is
   why the [failure-mode register](FAILURE_MODES.md) is a cost document too.
+
+### The ratio nobody models
+
+**The evaluation infrastructure costs roughly 19x the inference it governs.**
+
+| Item | Cost |
+|---|---|
+| Golden set: 1,300 documents, double-annotated with adjudication | **~$28,000 one-off** |
+| Drift canary, quarterly re-adjudication, CI eval compute | **~$1,900/month** |
+| The LLM tokens all of that governs | **~$100/month** |
+
+That ratio looks absurd and it is correct, because the tokens are not what can hurt you. It is
+also the line teams forget, and then quietly stop running evals when someone notices the bill.
+
+Two related corrections to the model above. The workhorse model's price is **$2/$10 per million
+tokens, not $3/$15** — an introductory rate that was made permanent, so any figure built on the
+higher number is a third too pessimistic. And **fine-tuning is not worth it**: the compute is ~$35,
+but 30,000 double-annotated extraction examples cost **~$224,000** in labelling. Against a ~$70/month
+inference bill the payback never arrives. The trigger that would change this is not volume — it is
+a licence forbidding third-party APIs, which given the clauses above is the likeliest one to fire.

@@ -220,6 +220,33 @@ read as confident prose. A system that claims otherwise has encoded a guess as a
 
 ---
 
+## 9. Prompt caching that silently stops working
+
+**Mechanism.** Cached prefixes require a **minimum length**, and that minimum differs per model —
+4,096 tokens on the cheap workhorse tier, 512 on the frontier tier. It is **not monotonic across
+generations**, so intuition is no guide. Below the threshold, caching does not error. It
+**silently no-ops**: no warning, both cache counters return zero, and every call bills at full
+input price indefinitely.
+
+**Why it survives review.** The failure is introduced by an improvement. Someone tightens the
+extraction prompt from 4,200 tokens to 3,900, the output quality is unchanged or better, tests
+pass, and the inference bill multiplies roughly tenfold on the prefix. Nothing in the diff, the
+tests, or the logs mentions caching.
+
+**Detection.** Assert `cache_read_input_tokens > 0` in CI on a representative call, and alert on
+it in production. A prefix-length regression test is one line and catches the whole class.
+
+**Mitigation.** Keep the frozen prefix comfortably above the threshold for the *specific* model in
+use — deliberately, with a comment saying why — and pin the model. Also, sort every serialised
+structure and keep timestamps, request ids and anything else non-deterministic **below** the cache
+breakpoint. A `datetime.now()` in a system prompt is the most common cause of a permanent 0% hit
+rate, and it presents identically: no error, just a larger bill.
+
+**Related trap in the same family.** A gate-changing feature flag can invalidate the cache
+wholesale. Decide such flags once, pipeline-wide, rather than per document.
+
+---
+
 ## The rest, in short
 
 Real, and each would hurt — but none is peculiar to this system.
