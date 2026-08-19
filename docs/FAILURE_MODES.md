@@ -309,6 +309,59 @@ an optimisation.
 
 ---
 
+## 12. A "leading indicator" that is computed from the thing it leads
+
+**Mechanism.** Vietnamese domestic robusta prices, quoted daily in VND/kg by Vietnamese outlets,
+look like an origin-country signal invisible to an English pipeline. They are not a signal at
+all. The published formula is:
+
+```
+domestic VND/kg = London USD/tonne x USD/VND ÷ 1000 ± local differential
+```
+
+Vietnam is UTC+7, so the morning domestic print is derived from the **previous** London
+settlement. **Any measured "lead" is a timezone artefact of a lagging transform.** A backtest
+would find one, and it would be entirely spurious.
+
+**Detection.** Before treating any origin quote as independent, ask how it is constructed. If a
+formula exists, the series is a transform, not an observation. Check whether the correlation
+survives removing the benchmark and the FX rate — if nothing is left, there was nothing there.
+
+**Mitigation.** The informative component is the **differential**, not the level, because the
+differential is the only genuinely local term. Even then it is not exogenous: a futures rally
+mechanically compresses physical premiums, so differentials and flat price move together for
+reasons that have nothing to do with local scarcity.
+
+**The generalised lesson.** This system's whole premise is that origin-language sources carry
+information the English wires miss. That is true of *reporting* and false of *prices*. A price
+quoted at origin in local currency is usually the benchmark in a costume, and mistaking the
+costume for the body is how an exotic-looking dataset becomes a spurious edge.
+
+---
+
+## 13. Treating the official record as the timely one
+
+**Mechanism.** The Federal Register looks like the authoritative, machine-readable, timestamped
+source for policy actions — exactly what a pipeline should key on. For US tariff actions it is a
+**lagging** indicator: executive orders in the 2025 tariff family were filed for public
+inspection **two to ten days after the wires had them**, and their annexes — the part carrying
+the actual product-level detail — are published as **images, not text**. There is no
+machine-readable version of the thing that matters.
+
+The timely machine-readable source is the customs agency's own bulletin, which carries a precise
+timestamp and the operative tariff lines.
+
+**Detection.** For any "official" source, measure publication lag against the wire directly
+before building on it. An authoritative source that is late is worse than an unofficial one that
+is early, because its authority discourages the check.
+
+**Mitigation.** Key on the operational bulletin, not the legal record. And note the corollary
+that makes it interesting: a *proposed* action with a comment period publishes its exclusion
+annex **weeks before** the final action, so the buried signal is in the **diff** between the
+proposed annex and the relevant tariff schedule — which is a parsing problem, not a news problem.
+
+---
+
 ## The rest, in short
 
 Real, and each would hurt — but none is peculiar to this system.

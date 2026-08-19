@@ -110,16 +110,39 @@ no amount of statistical sophistication recovers the context.
 
 ---
 
-## Honest limits
+## The generality test, run
 
-- **n = 1.** This is an illustration of a mechanism, not evidence about its generality. No
-  statistic is quoted for the episode because none is available from a single event.
-- The generality test is a separate, pre-registered question: does `Δpending` add explanatory
-  power for `Δcertified` beyond an autoregressive baseline, in the post-rule regime, with the
-  pre-rule regime as the control? The mechanism predicts the effect should be **weaker before
-  1 December 2023**, because the queue was contaminated by re-certification. A mechanism that
-  predicts its own absence is the only thing at this sample size that distinguishes a case study
-  from a cherry-pick.
+The episode above is n = 1. The pre-registered question was whether the queue leads the number
+in general, or whether December 2023 was a coincidence dressed as a mechanism.
+
+Across **182 observations, January 2021 – August 2026**, pending grading as a share of certified
+stock, regressed against the **forward** change in certified stock, with two controls:
+
+| Horizon | pending/cert → forward change | certified **level** (mean-reversion control) | trailing change (momentum control) |
+|---|---:|---:|---:|
+| 14 days | **+0.644** | +0.362 | +0.592 |
+| 28 days | **+0.606** | +0.321 | +0.522 |
+| 42 days | **+0.583** | +0.300 | +0.320 |
+
+It beats both controls at every horizon, and the margin **widens** at 42 days — so it is not
+simply momentum in the certified series wearing a different name.
+
+Two further dated episodes outside the 2023 window, from the same series:
+
+- **November 2022.** Certified stocks hit a 23-year low of 384,795 on 2 Nov. Pending grading went
+  3,436 (17 Oct) → 142,176 (2 Nov) → **577,099 (16 Nov)**. Certified then rebuilt to 753,981 by
+  16 December. The queue announced, with roughly the right magnitude, that the "record low
+  stocks" bull story was about to be buried.
+- **May–June 2026.** The queue fell to **literally zero** — the file prints "No Grading Pending"
+  on 2 June — and certified stocks bled every session from 462,777 to 229,214, **−50%**.
+
+**And the honest limit, which is large.** Part of this correlation is an **accounting identity**:
+bags in the queue that pass grading *become* certified bags. It is a leading indicator of the
+**number**, not independent information about **supply**. Three things stop it being purely
+mechanical — bags fail grading, the queue is silent about withdrawals (which is what actually
+drives drawdowns), and de-certified coffee can be re-submitted, so pending bags are not
+necessarily new coffee. Its value is **timing, not insight**, and that distinction should survive
+into any use of it.
 - **The price leg is reported as a negative result and should stay that way.** If a later test
   finds an edge here, the burden is on that test.
 - `KC=F` is a spliced continuous front-month series with roll discontinuities, not official ICE
@@ -134,6 +157,57 @@ no amount of statistical sophistication recovers the context.
 - Backfill `ingest_time` is not recoverable. The file's internal `As of:` stamp is the event
   time; a defensible ingest clock for archaeology is the next business morning, which
   deliberately discards up to a session of edge.
+
+## The level is a trap, and this is the part worth publishing
+
+The naive companion story — "low certified stocks are bullish" — is not merely unproven. It has
+the wrong sign at the two moments it is most often quoted:
+
+| | Certified stocks | What KC did next |
+|---|---|---|
+| Jul 2021 | multi-year **high**, 2,188,158 bags | rallied to **260.45** by Feb 2022 |
+| Nov 2022 | **23-year low**, 382,695 bags | fell to **142.05** by Jan 2023, **−45.5%** |
+| Mar–Jun 2026 | **−25% drawdown** | fell ~25% to its low of **238.85** on 9 Jun |
+
+Record-low stocks preceded a 45% decline. A multi-year high preceded a 70% rally. The 2026
+drawdown gave a wrong-way signal for three months before it gave a right-way one.
+
+**Certified stocks are a conditioning variable, not a signal.** They govern how violently the
+market reacts to a weather headline; they do not generate the headline. Anyone backtesting
+"stocks down, buy" will find those two episodes destroy it — which is the same conclusion, from
+the opposite direction, as the price legs above.
+
+One compositional fact nobody quotes: **Brazil's share of certified arabica fell from 49.7%
+(941,210 bags, April 2021) to 2.8% (6,428 bags, August 2026).** Honduras, Peru, Uganda and Mexico
+now dominate the deliverable pool. The benchmark's certified stock has very little to do with the
+crop the market actually prices.
+
+## A better buried signal, found while looking for this one
+
+The strongest genuinely-buried item surfaced in this whole exercise is not in the news, the price
+series or the stock file. It is in the **rulebook**.
+
+ICE is adding **Vietnam as a deliverable origin against the Coffee "C" arabica contract**, at
+**−600 points** — the same discount as Brazil — effective with the **May 2027** contract. Board
+approved 27 March 2025, effective 15 April 2025, published in a rulebook appendix and a one-page
+exchange notice.
+
+The world's largest coffee exporter becoming deliverable against the world arabica benchmark is a
+structural change to the deliverable supply pool, **dated two years forward**, that a
+2027-expiry position can express. It is free, public, and permanently observable — and it is in a
+PDF appendix that no news pipeline reads.
+
+The same rulebook carries a second one: a **Transition Stocks Discount**, escalating to
+**900 points (9 c/lb) by December 2028**, applying to coffee without validated deforestation
+due-diligence. On 18 August 2026 that was **161,137 of 229,214 certified bags — 70.3%** of the
+deliverable pool. The schedule has been deferred twice, each time tracking an EU regulatory
+delay, and you can watch the deferral happen in **two sentences of a spreadsheet footnote** that
+changed between September 2025 and June 2026.
+
+Neither has a demonstrated price move attached, and neither is claimed to. They are recorded
+because they are exactly the shape this system should be built to catch and the news pipeline
+structurally cannot: **dated, mechanical, forward-known changes to contract economics, published
+in primary documents nobody parses.**
 
 ## Reproducing it
 
