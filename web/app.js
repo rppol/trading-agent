@@ -383,6 +383,7 @@ const ROUTES = {
   "#/cost": { render: viewCost, bind: bindCost, surface: "paper" },
   "#/cost-doc": { doc: "COST.md", surface: "paper" },
   "#/case": { doc: "CASE_STUDY.md", surface: "paper" },
+  "#/orchestration": { doc: "ORCHESTRATION.md", surface: "paper" },
   "#/measurements": { doc: "MEASUREMENTS.md", surface: "paper" },
 };
 
