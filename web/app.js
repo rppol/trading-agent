@@ -400,6 +400,7 @@ const ROUTES = {
   "#/wheat": { doc: "WHEAT.md", surface: "paper" },
   "#/edge": { doc: "EDGE.md", surface: "paper" },
   "#/pipeline": { doc: "PIPELINE.md", surface: "paper" },
+  "#/learning": { doc: "LEARNING.md", surface: "paper" },
 };
 
 async function render() {
