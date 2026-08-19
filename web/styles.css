@@ -225,6 +225,26 @@ blockquote.ev {
 
 /* ---------------------------------------------------------------- doc pages */
 
+/* Document layout: the CONTAINER carries the reading measure, not each element.
+   Capping elements individually left every paragraph short while `table{width:100%}`
+   ran to the edge -- prose in the left half, tables across the whole page. A
+   three-column grid centres the measure and lets tables, diagrams and code
+   deliberately break out wider. */
+.doc.prose {
+  max-width: none;
+  display: grid;
+  grid-template-columns: 1fr min(var(--col), 100%) 1fr;
+  column-gap: 0;
+}
+.doc.prose > * { grid-column: 2; min-width: 0; }
+.doc.prose > :is(table, pre, .mermaid) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(1120px, 100%);
+  max-width: 100%;
+}
+.doc.prose > table { table-layout: auto; }
+
 .doc :is(h2,h3) { max-width: var(--col); }
 .doc p, .doc li { max-width: var(--col); }
 .doc table { margin: 1.2em 0 2em; }
