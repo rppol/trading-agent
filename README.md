@@ -26,8 +26,8 @@ cached queries and minutes for fresh inference.
 **The headline finding is that GDELT does not contain the signal.** Measured over 675,840
 documents and 8,383 domains in seven days: Reuters zero, Cecafé zero, Conab zero, ICO zero,
 every coffee trade publication zero — while a radio syndication network supplies 7.8% of the
-corpus. The ~20 "tradeable" coffee documents a day are the false-positive floor, not thin
-signal. This is an acquisition problem, not an NLP one, and no extraction quality fixes it.
+corpus. Under five "tradeable" coffee documents a day survive — the false-positive floor, not
+thin signal. This is an acquisition problem, not an NLP one, and no extraction quality fixes it.
 
 **The volumes in the brief are a misdirection.** 10M AIS pings/day is 116 messages a second.
 500 documents a day is about $9 of tokens. Only the imagery is genuinely large, and its cost

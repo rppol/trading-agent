@@ -51,8 +51,12 @@ def main() -> dict:
             "window_end": max((d["event_time"] for d in docs), default=None),
             "languages": sorted({d["language"] for d in docs if d["language"]}),
         },
-        # Measured on live GDELT batches while building, not estimated.
-        "funnel": {"docs_per_batch": 1550, "coffee_mentions": 1.7, "market_relevant": 0.25},
+        # Measured across the full 673-batch corpus, not extrapolated from a sample.
+        # An earlier version quoted 1550 docs/batch from a single observation; the
+        # true distribution is mean 1004, median 946, range 314-2189.
+        "funnel": {"docs_per_day": 96405, "coffee_in_title_per_day": 88.3,
+                   "tradeable_per_day": 4.7, "cheap_filter_removes_pct": 95,
+                   "docs_per_batch_mean": 1004, "docs_per_batch_median": 946},
     }
     (OUT / "claims.json").write_text(json.dumps(claims, separators=(",", ":")))
     (OUT / "docs.json").write_text(json.dumps([{

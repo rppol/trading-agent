@@ -94,7 +94,7 @@ function viewOverview() {
     Conab, the International Coffee Organization, and every coffee trade publication: <b>zero</b>.
     Meanwhile a radio syndication network supplies <b>7.8%</b> of the corpus and boredpanda.com
     is a top-ten source.</p>
-    <p>So the ~20 tradeable coffee documents a day this pipeline surfaces are not thin signal —
+    <p>So the <b>4.7</b> tradeable coffee documents a day this pipeline surfaces are not thin signal —
     <b>they are the false-positive floor</b>. This is an acquisition problem wearing the costume
     of an NLP problem, and no amount of extraction quality recovers information that was never
     ingested. The honest architecture demotes GDELT to what it is genuinely good at — an

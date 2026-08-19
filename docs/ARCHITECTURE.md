@@ -39,7 +39,7 @@ And what *is* there:
 | `yahoo.com` | 1.2% |
 | `boredpanda.com` | 0.5% |
 
-**So the ~20 "tradeable" coffee documents a day this pipeline surfaces are not thin signal.
+**So the ~5 "tradeable" coffee documents a day this pipeline surfaces are not thin signal.
 They are the false-positive floor.** The wires, the trade press and the primary institutions
 that actually move the Coffee C contract are not in the corpus at all.
 
@@ -355,7 +355,7 @@ Measured, not assumed:
   returns the error string `Parentheses may only be used around OR'd statements.` with a
   200 status. Another fail-open.
 - The **bulk GKG files have no such limit**: `lastupdate.txt` names the current 15-minute
-  batch with size and MD5, each ~6 MB compressed, ~1,550 documents.
+  batch with size and MD5, each ~6 MB compressed, ~1,000 documents (median 946, range 314–2,189).
 - GDELT **rewrites its own archive**. Backtesting against today's archive uses records that
   did not exist at decision time.
 
@@ -368,16 +368,25 @@ what makes a rerun reproduce the same corpus.
 
 ## 5. Document processing: a cascade, because precision is the scarce resource
 
-The instinct is to worry about token cost. The measurements say otherwise. Per 15-minute
-GKG batch:
+The instinct is to worry about token cost. The measurements say otherwise — and the figures
+below are the full 673-batch corpus, not an extrapolation from one sample.
 
-```
-1,550 documents
-   ↓  commodity term present            ~1.7
-   ↓  market vocabulary present         ~0.25
-```
+| Stage | Over 7 days | Per day |
+|---|---:|---:|
+| Documents ingested | 675,840 | **96,405** |
+| Coffee term in the title | 619 | **88.3** |
+| Removed by the retail blocklist | 153 | 21.8 |
+| **Survives the market filter** | **33** | **4.7** |
 
-Extrapolated: **~160 coffee-mentioning documents per day, of which ~15–25 are tradeable.**
+**Under five tradeable coffee documents a day**, and the cheap filter removes **95%** of
+coffee-mentioning documents before any model runs.
+
+A note on how that table was produced, because an earlier draft of this section was wrong in
+an instructive way. It quoted 1,550 documents per batch — a figure taken from a *single*
+batch sampled early and then written down as a constant. The true distribution across all 673
+batches is **mean 1,004, median 946, range 314–2,189**: a sevenfold spread, so quoting any
+single number was misleading regardless of which one. The corrected funnel is a fifth the size
+of the published one, which makes §1a's breadth problem worse rather than better.
 
 The 85% the cheap filter removes are real: coffee-shop openings, campus promotions, a
 retirement-town listicle, and — before the filter was tightened — a stag shot in a park,
@@ -386,14 +395,14 @@ without one matches *Washington*.
 
 ```mermaid
 flowchart LR
-    R(["Raw GKG batch<br/>1550 docs"]) --> K{"Commodity term?"}
+    R(["Raw GKG batch<br/>~1000 docs"]) --> K{"Coffee in title?"}
     K -->|no| X1(["dropped"])
-    K -->|yes ~1.7| MK{"Market vocabulary?"}
-    MK -->|no ~85%| X2(["dropped"])
-    MK -->|yes| D["Near-dup collapse<br/>+ novelty"]
-    D --> TR{"Trading-relevant?<br/>small model"}
-    TR -->|no| X3(["dropped"])
-    TR -->|yes ~5%| L["Claim extraction<br/>frontier model"]
+    K -->|"yes 0.9/batch"| BL{"Retail blocklist?"}
+    BL -->|"yes 25%"| X2(["dropped"])
+    BL -->|no| MK{"Market vocabulary?"}
+    MK -->|no| X3(["dropped"])
+    MK -->|"yes 4.7/day"| D["Near-dup collapse<br/>+ novelty"]
+    D --> L["Claim extraction<br/>frontier model"]
     L --> G{"Verbatim span<br/>+ number present?"}
     G -->|no| X4(["rejected"])
     G -->|yes| C[("Claim ledger")]
@@ -404,7 +413,7 @@ flowchart LR
     classDef work fill:#4c566a,stroke:#88c0d0,color:#eceff4
     classDef store fill:#2e3440,stroke:#a3be8c,color:#eceff4
     class R src
-    class K,MK,TR,G gate
+    class K,BL,MK,G gate
     class X1,X2,X3,X4 drop
     class D,L work
     class C store
