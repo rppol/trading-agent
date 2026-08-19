@@ -627,6 +627,43 @@ mechanical.
 A system that scores news without conditioning on inventory and positioning will be
 confidently wrong in precisely the situations that matter most.
 
+### The regime claim, tested — and the mechanism is wrong
+
+The paragraph above was assertion until `signals/positioning.py` was built. Tested over **519
+weekly observations**, with positioning keyed to its **Friday release** rather than its Tuesday
+as-of date (using the Tuesday grants three free days of lookahead every week, and it looks like
+skill):
+
+| Test | r | t |
+|---|---:|---:|
+| Crowding → 4-week **return** — the naive contrarian trade | **−0.007** | −0.17 |
+| Crowding → 4-week **absolute move** — the regime claim | **+0.122** | **+2.79** |
+
+**The contrarian direction trade is dead.** Fading crowded managed-money length predicts nothing:
+r is indistinguishable from zero on 519 observations.
+
+**The magnitude claim is statistically significant** — crowded positioning does precede larger
+moves. But the buckets say the mechanism is not the one we argued:
+
+| Crowding bucket | n | mean 4wk | **mean absolute move** |
+|---|---:|---:|---:|
+| Top decile — crowded long | 129 | −0.50% | **7.56%** |
+| Bottom decile | 82 | +0.93% | **5.53%** |
+| Middle of the range | 65 | −1.51% | **8.28%** |
+
+If "crowded positioning means a squeeze" were the mechanism, the tails would be the violent ones.
+They are not — **the middle is**. The significant correlation is driven by extreme *short*
+positioning being unusually **quiet**, not by extreme long positioning being unusually violent.
+
+So the claim survives in a narrower and less flattering form: **positioning carries information
+about how much the market is about to move, and the direction of that information is not the
+squeeze story.** Sizing a signal on "crowded longs will be forced out" would be trading a
+mechanism the data does not support, while the effect that is real — low crowding predicts calm —
+is much less useful because it tells you when *not* to expect anything.
+
+This is the same shape as every other finding here: a real effect, a wrong story about why, and
+the difference only visible once someone fetched the data.
+
 ```mermaid
 flowchart LR
     C[("Claims")] --> F["Features<br/>decay, novelty, confidence"]
