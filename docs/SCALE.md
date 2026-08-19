@@ -46,38 +46,68 @@ silently becomes a multi-day one.
 
 ---
 
-## 2. The other inverted intuition: the cheap tier is the bill
+## 2. The cheap tier is the bill — and the model choice matters ~53x more than the hosting choice
 
 Because 97%+ of documents never leave the filter, **filter spend dominates total LLM cost at every
-tier.**
+tier.** The cascade rate only moves the smaller number.
 
-| Tier | Filter/month | Extraction/month (3%) | Total |
+**But the first version of this section drew the wrong conclusion from that**, and the error is
+instructive. It priced the filter at a frontier-vendor small model (~$1/$5 per M tokens) and
+compared *that* against renting GPUs, concluding "self-host the filter at Tier 2, ~5x cheaper."
+
+**The filter should never have been priced at $1/M.** An 8B-class model on a cheap-inference
+provider is **$0.02/$0.04 per M** — about **53x cheaper per document** for a task that is a short
+input and a ~20-token output. Correcting the model choice changes everything:
+
+| Tier | Filter @ $1/$5 model | Filter @ $0.02/$0.04 model | Self-hosted GPUs |
 |---|---|---|---|
-| 1 | $3,150 | $756 | **~$3,900** |
-| 2 | $31,500 | $7,560 | **~$39,100** |
-| 3 | $315,000 | $75,600 | **~$391,000** |
+| 1 | $3,150/mo | **~$62/mo** | <1 GPU, uneconomic |
+| 2 | $31,500/mo | **~$625/mo** | ~$6,458/mo |
+| 3 | $315,000/mo | **~$6,240/mo** | ~$64,584/mo |
 
-At the 1%–5% extremes extraction moves between $252 and $1,260 at Tier 1, and $25,200 and $126,000
-at Tier 3 — **the filter still dominates regardless**, because the cascade rate only changes the
-smaller number.
+**So self-hosting the filter loses at every tier — by roughly 10x, not wins by 5x.**
 
-**Which inverts what to self-host.** The instinct is to self-host the expensive model. The
-arithmetic says self-host the *cheap* one first:
+### And it cannot win, at any volume, for a reason that is not about utilisation
 
-| Tier | Filter self-hosted | vs API | Verdict |
-|---|---|---|---|
-| 1 | <1 GPU | $3,150 API | **stay on API** — one dedicated GPU's fully-loaded cost exceeds the bill |
-| 2 | ~3x H100 ≈ $6,458/mo | $31,500 API | **self-host — ~5x cheaper.** This is the crossover |
-| 3 | ~30x H100 ≈ $64,584/mo | $315,000 API | **self-host, and it is partly forced** — see below |
+A rented H100 at **100% utilisation** costs about **$0.22/M tokens** for an 8B model. The hosted
+price is **$0.02/M**. That is 11x cheaper than your own hardware running *perfectly*, before
+counting idle time, failover, ops burden or model-update revalidation.
 
-**At Tier 3 it stops being a cost decision.** 8.5B filter tokens/day is roughly **5.9M tokens per
-minute sustained**, which exceeds standard API rate-limit tiers regardless of budget. Capacity, not
-price, makes the decision.
+**This is a pricing-floor problem, not a utilisation problem.** Fleet operators run at
+utilisation a single deployment cannot reach and price below your marginal compute cost. At
+realistic utilisation — Tier 1's filter load is under 4% of one GPU — self-hosting costs
+~$5.60/M, worse than a frontier small model.
 
-Self-hosting *extraction* is a later and harder call: ~3x cheaper at Tier 3 (~$25,834 vs $75,600),
-but open 70B-class models generally trail frontier quality on structured extraction and entity
-resolution, and multi-GPU serving is real operational burden. Pilot it against the golden set
-before treating the cost arithmetic as the decision.
+The general lesson, which holds beyond this system: **managed open-weight providers already sit at
+the utilisation ceiling you could only dream of hitting, so DIY self-hosting rarely beats them
+economically.** Fireworks/Together price a 70B model at $0.90–1.04/M — almost exactly a
+self-hosted H100's marginal cost at 100% utilisation, because that is what fleet-operated hosting
+*is*.
+
+### Extraction: hosted too, and the break-even is far away
+
+Blended cost for the extraction shape (~11k input, ~800 output) on a frontier mid model is about
+**$2.54/M**. A self-hosted 70B at 100% utilisation is **$0.93/M** — so break-even is ~36.6%
+utilisation, which is roughly **2,150 extraction docs/day**. Add ops labour and continuous GPU
+rental and it moves to **~3,800/day**. At the brief's volume that is 15x away.
+
+**The one thing that does change the answer sooner:** if an eval shows an open 70B via a managed
+provider matches frontier accuracy on the extraction schema, switching cuts cost ~60% with **zero
+infrastructure work** and no volume threshold at all. That is an eval question, not a scale
+question — and on a correctness-critical path it should not be taken on faith.
+
+### Where self-hosting genuinely does become forced
+
+**Rate limits, at Tier 3.** 8.5B filter tokens/day is ~5.9M tokens/minute sustained. Cheap-inference
+providers cap differently — one caps concurrency (200 concurrent requests per model) rather than
+RPM, another sets dynamic per-org limits with no published tiers. At 116 docs/sec average and
+several times that at burst, **capacity becomes the constraint before cost does**, and a dedicated
+deployment may be the only way to guarantee throughput.
+
+There is also an honest secondary benefit: because baseline utilisation would be so low, a
+self-hosted GPU has enormous burst headroom by construction, absorbing a 10–20x spike through
+queueing (latency degrades) rather than rejection (requests fail). That is not a reason to
+self-host today. It is a side benefit if volume forces the decision anyway.
 
 ---
 
@@ -89,7 +119,7 @@ before treating the cost arithmetic as the decision.
 | **Primary DB** | Single-node Postgres, for years | Postgres + read replicas, Citus-ready | **Citus (sharded).** Single-node write ceiling is a few thousand TPS because everything funnels through one WAL |
 | **Corpus storage** | S3, lifecycle-tiered. 11.7 TB | S3 tiered. 116.8 TB | **Iceberg/Delta lakehouse.** 1.17 PB was never going to be Postgres rows |
 | **Vector index** | pgvector, **migrate within year 1** | Managed vector DB — 730M vectors puts pgvector out of the question | Sharded + **quantization mandatory** |
-| **LLM** | Both tiers on API | **Self-host the filter**, extraction on API | Self-host filter (forced); pilot extraction |
+| **LLM** | Both tiers on API, cheap-inference filter | Both on API — self-hosting loses ~10x | Filter may be **self-hosted for capacity, not cost**; pilot extraction |
 | **Team** | 2–3 engineers | 5–8 | **15–25** — the jump is not linear in volume; it is the GPU fleet and distributed storage turning a team into a platform division |
 
 **Storage costs, and the one checkbox that matters:**
@@ -109,7 +139,8 @@ most controllable line in the whole system.
 
 - **Tier 1: LLM API spend, ~75% of total.** Everything else is nearly free at this volume.
 - **Tier 2: the vector index, if you pick a RAM-priced product.** 730M vectors punishes
-  per-GB-of-RAM pricing. Otherwise the self-hosted filter fleet and Kafka dominate.
+  per-GB-of-RAM pricing. With the filter correctly priced, LLM spend is ~$625/mo and Kafka is the
+  next line, so **the vector index is the whole decision at this tier**.
 - **Tier 3: the vector index, decisively — and it can dwarf everything else.** At 7.3B vectors the
   spread between object-storage-backed (~$880/mo storage) and RAM-priced quantized (~$210,000/mo)
   is roughly **240x for the same vector count.** Get this wrong and it exceeds the LLM bill, the

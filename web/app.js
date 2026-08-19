@@ -404,6 +404,7 @@ const ROUTES = {
   "#/stack": { doc: "STACK.md", surface: "paper" },
   "#/scale": { doc: "SCALE.md", surface: "paper" },
   "#/storage": { doc: "STORAGE.md", surface: "paper" },
+  "#/serving": { doc: "SERVING.md", surface: "paper" },
 };
 
 async function render() {
