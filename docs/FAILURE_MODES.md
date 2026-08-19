@@ -255,6 +255,60 @@ wholesale. Decide such flags once, pipeline-wide, rather than per document.
 
 ---
 
+## 10. The reference dataset that silently rewrites its own history
+
+**Mechanism.** USDA's PSD database — the free, canonical, machine-readable source for world
+coffee production — serves **only the current vintage**. Historical figures are revised, and the
+download gives you today's belief about 2011 rather than 2011's belief about 2011. There is no
+version, no as-of parameter, and nothing in the file says it has changed.
+
+**Why it manufactures alpha.** Measured on the Colombian rust episode: at the May 2011 price
+peak, the published USDA forecast had Colombia **recovering** to 9.5m bags for 2010/11 and 10.5m
+for 2011/12. The actual outturn was 8,525 and **7,655** — the second forecast was **37% too
+high**. The true figure did not appear in a USDA table until **November 2013**, a lag of roughly
+two and a half years, and the price bottomed nine days before it.
+
+Download the CSV today and the collapse looks plainly observable in 2011. **It was not.** Any
+backtest built on the current vintage will conclude a trader could have seen a shortfall that
+nobody could see, and will book the resulting edge as skill.
+
+This is the same defect as GDELT rewriting its archive, in a dataset with far more authority —
+and it is worse, because a research team is more likely to trust it and less likely to check.
+
+**Detection.** Compare the current vintage against a dated archived report for the same period.
+A discrepancy is not an error in either; it is the revision, and its size is the size of the bias
+your backtest inherits.
+
+**Mitigation.** The reference series must be reconstructed from **dated archived publications** —
+the semi-annual circulars and country reports as published — not from the current bulk download.
+That is slower and it is the only version that is point-in-time. It is also precisely what the
+two-clock design in ARCHITECTURE §3 exists to enforce: an official estimate is a **claim with an
+ingest time**, not a fact, and storing it as a fact destroys the ability to ask what was knowable.
+
+---
+
+## 11. Testing a signal against the wrong instrument
+
+**Mechanism.** An origin-scoped supply claim is a claim about that origin's **differential**, not
+about the benchmark future. Flat price is dominated by Brazil, the dollar and macro flows the
+claim is silent on. Evaluate an origin signal against flat price and a real effect is discarded
+as noise.
+
+**Measured.** Colombian rust moved the Colombian Milds premium from **+1.5 to +33.6 c/lb** with
+essentially zero lag, while contributing nothing identifiable to flat price — which rallied on a
+general commodity boom in which coffee lagged cotton, wheat and maize, and in which robusta,
+untouched by that rust, rallied nearly as much as arabica.
+
+**Detection.** For any signal carrying a `region`, run the evaluation against the differential
+and the calendar spread as well as flat price, and report all three. A signal that works only on
+flat price for an origin-specific claim should be treated as suspect, not as a finding.
+
+**Mitigation.** Budget for the instrument. Free point-in-time differential and spread series do
+not appear to exist, which makes acquiring them a precondition for honest evaluation rather than
+an optimisation.
+
+---
+
 ## The rest, in short
 
 Real, and each would hurt — but none is peculiar to this system.

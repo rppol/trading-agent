@@ -235,6 +235,61 @@ because it is the weakest joint in the chain.
 
 ---
 
+## 1a-ii. The instrument is probably wrong, and that is a bigger error than the model
+
+Every signal in this design implicitly targets **flat price**. The evidence says that is the
+wrong instrument for most of what the system extracts, and the cleanest demonstration is the
+Colombian coffee-rust episode of 2008–2012.
+
+Colombian arabica output fell from 12.5m bags to 7.7m — a 31% collapse in one year, the lowest
+since 1972/73. The story everyone tells is that this drove arabica to its May 2011 peak of
+306 c/lb. **That story is retrofitted, and three independent facts kill it:**
+
+- The ICO's own monthly market reports mention rust **zero times** in May 2011, November 2011
+  and January 2013. At the peak, the official narrative was *record* supply and a recovering
+  Colombia.
+- World arabica supply **rose 13.1%** into the peak (77.8m → 87.9m bags). Prices tripled into a
+  supply increase.
+- It was a general commodity boom in which coffee was **below median**: cotton +133%, wheat
+  +113%, maize +109%, arabica +57% — and **robusta +53%**. Colombia grows no robusta and this
+  rust never touched it. A four-point spread over ten months is noise.
+
+**But the signal was priced — precisely, promptly, and in a different instrument.** The ICO
+Colombian Milds group indicator carries origin-specific scarcity. Its premium over Other Milds:
+
+| Period | Colombian Milds premium |
+|---|---:|
+| 2003–2007 average | **+1.5 c/lb** |
+| 2008 | +4.5 |
+| **2009** | **+33.6 c/lb** |
+| 2010 | +29.5 |
+| Feb 2011 | +8.6 |
+| May 2011 (flat-price peak) | +11.1 |
+
+A roughly **twentyfold** move, **contemporaneous with the crop year it destroyed** — lag
+approximately zero. And by the flat-price top the origin premium had already deflated by
+two-thirds. The market priced the rust accurately in 2009 and had largely finished doing so
+before the rally that gets attributed to it.
+
+**The design consequence.** A supply-disruption claim about one origin is a claim about a
+**differential**, not about the benchmark. Flat price is dominated by Brazil, by the dollar, and
+by macro flows the claim says nothing about — which is exactly why the case study in
+[CASE_STUDY.md](CASE_STUDY.md) finds a correct physical signal with no flat-price edge, and why
+§1b reports that the futures basis may subsume `supply_risk` entirely.
+
+So `supply_risk` and `policy_shock`, both of which are origin-scoped by construction (they carry
+a `region` field), should be evaluated against **origin differentials and calendar spreads**
+first, and against flat price only as a fallback. This is not a modelling refinement. Testing an
+origin signal against the wrong instrument is how a real effect gets discarded as noise, and how
+a spurious one gets adopted.
+
+The practical obstacle is stated rather than waved at: there is **no verified free point-in-time
+series for the Coffee C calendar spread**, and the ICO's historical indicator series is not
+freely downloadable. Acquiring one is a precondition for testing this properly, and it belongs
+in the same acquisition budget as §0.
+
+---
+
 ## 1b. What the evidence says about the signals themselves
 
 Three findings from the literature contradict design decisions taken earlier in this document.
