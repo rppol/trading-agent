@@ -9,6 +9,40 @@ the current number is stated — see [EVIDENCE.md](EVIDENCE.md) for what was tes
 
 ---
 
+## 0. The system, end to end
+
+```mermaid
+flowchart TB
+  SRC([Five source families<br/>news, imagery, AIS, prices, macro])
+  SRC --> ING([Ingest<br/>snapshot + two clocks])
+  ING --> CAS([Cascade — ~95% removed])
+  CAS --> EXT([Extract<br/>typed cited claims])
+  EXT --> GTE([Grounding gate<br/>span + number])
+  GTE --> CLM[(Claims — bitemporal)]
+  CLM --> SIG([Score — deterministic])
+  SIG --> API([API — cached + fresh])
+  CLM --> AGT([Agents<br/>corroborate / resolve])
+  AGT --> CLM
+  CLM --> LRN([Learning loop])
+  LRN --> CAS
+  classDef src fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef proc fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef store fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  classDef out fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  class SRC src
+  class ING,CAS,EXT,GTE,AGT,LRN proc
+  class CLM store
+  class SIG,API out
+```
+
+**Read it in three moves.** Left of the gate the system is *reducing* — 96,405 documents a day
+become 4.7 tradeable claims. At the gate it is *verifying* — nothing enters the store whose
+evidence cannot be pointed at. Right of the store it is *deterministic* — arithmetic, not a model,
+turns claims into signals. The two feedback edges are the only cycles: agents enrich claims, and
+the learning loop retunes the cascade.
+
+---
+
 ## 1. The brief's volumes are a misdirection, and saying so is the answer
 
 | Stated | Actually |
@@ -58,6 +92,22 @@ retraining cheap, because the expensive half stops changing.
 
 Every record carries `event_time` (when the world changed) and `ingest_time` (when we learned).
 Every query names which it means; point-in-time reads filter on `ingest_time`.
+
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant W as World
+  participant P as Publisher
+  participant U as Our pipeline
+  participant Q as Query at as_of T
+  W->>W: frost occurs — event_time
+  W->>P: reported hours later
+  P->>U: fetched — ingest_time
+  U->>U: claim stored carrying BOTH stamps
+  Q->>U: what did we know at T
+  U-->>Q: rows where ingest_time <= T only
+```
 
 **This cannot be retrofitted.** You can recover when something happened; you can never recover
 when you learned it. One column now, or an honest backtest never.
@@ -129,12 +179,12 @@ documents that did not exist at their claimed timestamps.
 
 ```mermaid
 flowchart LR
-  A([~1,004 docs<br/>per batch]) --> B([Lexicon + entity gate])
-  B --> C([Near-dup collapse])
-  C --> D([Cheap classifier])
-  D --> E([Frontier extractor<br/>structured output only])
-  E --> F([Grounding gate<br/>span + number])
-  F --> G([~4.7 tradeable<br/>claims/day])
+  A([~1,004 docs<br/>per batch]) --> B([Lexicon<br/>+ entity])
+  B --> C([Near-dup<br/>collapse])
+  C --> D([Cheap<br/>classifier])
+  D --> E([Extract<br/>structured only])
+  E --> F([Gate<br/>span + number])
+  F --> G([~4.7 claims<br/>per day])
   classDef cheap fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
   classDef mid fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
   classDef exp fill:#4c3a3a,stroke:#bf616a,color:#e5e9f0
@@ -152,6 +202,25 @@ a model that can call tools on attacker-controlled text is an attack surface wit
 position attached.
 
 ### The grounding gate
+
+
+```mermaid
+flowchart LR
+  M([Model output<br/>claim + quote]) --> S{Quote verbatim<br/>in the source?}
+  S -->|no| RJ([Reject])
+  S -->|yes| NM{Every number<br/>inside that span?}
+  NM -->|no| RJ
+  NM -->|yes| AC([Accept<br/>write claim])
+  RJ --> GS[(Golden set<br/>free labelled failure)]
+  classDef inp fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef chk fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef bad fill:#4c3a3a,stroke:#bf616a,color:#e5e9f0
+  classDef good fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  class M inp
+  class S,NM chk
+  class RJ,GS bad
+  class AC good
+```
 
 A numeric claim is rejected unless its figure appears **literally in the cited span**, NFKC-
 normalised. This is the system's referee and it is deterministic.
@@ -185,6 +254,29 @@ contextual BM25.
 The extractor gets **no retrieval** — the document is the input, and retrieved passages invite
 citing text the source never contained. Retrieval serves memory, not context:
 
+
+```mermaid
+flowchart TB
+  C([New claim]) --> NV([Novelty<br/>MinHash + LSH<br/>NOT vector search])
+  C --> ER([Entity resolution<br/>alias table + fuzzy<br/>NOT vector search])
+  C --> HI([History<br/>SQL WHERE clause<br/>NOT retrieval at all])
+  C --> CO([Corroboration<br/>BM25 + dense + RRF<br/>the only real search])
+  CO --> PI{Independent<br/>publisher?}
+  PI -->|syndicated copy| DROP([Not counted])
+  PI -->|independent| SC([Scored claim])
+  NV --> SC
+  ER --> SC
+  HI --> SC
+  classDef inp fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef cheap fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  classDef real fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef bad fill:#4c3a3a,stroke:#bf616a,color:#e5e9f0
+  class C inp
+  class NV,ER,HI cheap
+  class CO,PI,SC real
+  class DROP bad
+```
+
 | Job | What it actually is |
 |---|---|
 | **Novelty** | **near-duplicate detection** — MinHash/SimHash + LSH. Cosine similarity conflates "same fact restated" with "related but distinct", the boundary that must stay sharp |
@@ -209,6 +301,29 @@ ballgame; measured dedup ratio 0.121 means **12% is echo**.
 ---
 
 ## 8. Storage and indexing
+
+
+```mermaid
+flowchart LR
+  D([Document]) --> SN[(Immutable snapshot)]
+  SN --> CH([Chunk on structure<br/>carry char_offset])
+  CH --> EM([Embed raw text<br/>no summarisation])
+  CH --> BM([BM25 index])
+  EM --> PG[(Postgres<br/>pgvector halfvec HNSW)]
+  BM --> PG
+  SN -.->|span resolved here| GT([Grounding gate])
+  CH -.->|char_offset| GT
+  classDef src fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef proc fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef store fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  class D,SN src
+  class CH,EM,BM,GT proc
+  class PG store
+```
+
+**The dotted edges are the load-bearing part.** The gate resolves a span against the *snapshot*,
+never the chunk — otherwise a fabrication straddling a chunk boundary verifies clean, because the
+text does exist in the fragment the model was handed.
 
 **One Postgres instance holds everything.** At the pilot's volume a dedicated vector database
 solves a problem we do not have.
@@ -282,6 +397,26 @@ Reported here rather than quietly dropped, because that is the whole method.
 
 ## 10. Serving: promise freshness, not latency
 
+
+```mermaid
+flowchart LR
+  CQ([Client]) --> RT{Route}
+  RT -->|current signal| RD[(Redis<br/>online vector)]
+  RD --> R1([p99 &lt; 250 ms<br/>+ staleness stamp])
+  RT -->|as_of T| PGQ[(Postgres<br/>ingest_time &lt;= T)]
+  PGQ --> R2([p99 &lt; 2 s<br/>point-in-time replay])
+  RT -->|POST refresh| JQ([Job queue])
+  JQ --> WK([Worker<br/>fetch, extract, gate])
+  WK --> R3([Minutes<br/>poll job id])
+  WK --> PGQ
+  classDef inp fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef store fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  classDef out fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  class CQ,RT,JQ,WK inp
+  class RD,PGQ store
+  class R1,R2,R3 out
+```
+
 | Path | SLO |
 |---|---|
 | Any precomputed signal, any `as_of` | p99 < 250 ms — **a UI-responsiveness SLO, not a trading one** |
@@ -309,6 +444,34 @@ textbook fit for a fixed prefix with a varying suffix, and it hides constrained-
 
 ## 12. Orchestration: workflows, with two exceptions
 
+
+```mermaid
+flowchart TB
+  subgraph WF[Workflow — fixed step count, traced, no planner]
+    direction LR
+    T([Triage]) --> X([Extract]) --> G([Gate]) --> WR([Write])
+  end
+  WR --> DB[(Claims store)]
+  subgraph AG[Agents — step count unknown in advance]
+    direction LR
+    CH([Corroboration hunt])
+    CR([Contradiction resolution])
+    HR([Analyst review<br/>human interrupt])
+  end
+  DB --> AG
+  AG --> DB
+  classDef wf fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  classDef ag fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  classDef store fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  class T,X,G,WR wf
+  class CH,CR,HR ag
+  class DB store
+```
+
+**Everything in the left box is a function call.** Modelling it as graph nodes buys one uniform
+tracing surface, not a state machine — and the design says so rather than pretending the linear
+path needed a planner. Only the right box uses checkpointing, resumability and interrupts.
+
 **Most of this pipeline is not agentic and should not be.** Triage, extraction, grounding, scoring
 and serving are a fixed sequence with known inputs. Two jobs genuinely warrant agency because the
 step count is unknown in advance: the **corroboration hunt** and **contradiction resolution** —
@@ -325,6 +488,29 @@ What the evidence says, since these patterns are usually chosen by fashion:
 | **No ensembling of similar models** | A 9-model panel from 7 families carries ~**two** independent votes; error correlation *increases* with accuracy |
 | **No long chains** | 70% per step over three steps is **34%**. Multiplicative |
 | **No tools on the extractor** | Untrusted content + tool access is the injection setup. Break the lethal trifecta |
+
+
+### Inside an agent, and where it is forced to stop
+
+```mermaid
+stateDiagram-v2
+  [*] --> Plan
+  Plan --> Search
+  Search --> Read
+  Read --> Judge
+  Judge --> Search : budget remains and still unresolved
+  Judge --> Resolved : independent primary source found
+  Judge --> Contradicted : primary source refutes the claim
+  Judge --> Unresolved : step or wall-clock budget exhausted
+  Resolved --> [*]
+  Contradicted --> [*]
+  Unresolved --> [*]
+```
+
+**Three terminal states, and `Unresolved` is a first-class result.** An agent that cannot finish
+returns partial evidence and lowers the claim's confidence — it never loops, and it never
+adjudicates by asking a second model to agree. Every tool it holds is read or search only: no
+write, no send, which breaks the lethal trifecta even inside the agentic component.
 
 **Fan out by lens, not by volume.** Three agents asking the same question produce correlated
 agreement that reads as confirmation. Three with different remits produce information.
@@ -354,6 +540,37 @@ the same story in train and test), and split by **time** with an embargo equal t
 label horizon.
 
 ### Self-improvement needs external ground truth
+
+
+```mermaid
+flowchart TB
+  PR([Production]) --> A1([Gate rejections])
+  PR --> A2([Official release])
+  PR --> A3([Analyst verdict])
+  PR --> A4([Corroboration outcome])
+  PR --> A5([Cascade disagreement])
+  A1 --> GS[(Golden set<br/>append-only)]
+  A2 --> GS
+  A3 --> GS
+  A4 --> GS
+  A5 --> GS
+  GS --> CI{Beats champion on a<br/>held-out time slice?}
+  CI -->|no| RJ([Reject the candidate])
+  CI -->|yes| SH([Shadow traffic])
+  SH --> PM([Promote<br/>champion kept warm])
+  PM --> PR
+  FH[(Frozen holdout<br/>never trained on)] -.->|contamination check| CI
+  classDef prod fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef lab fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef gate fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  classDef good fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  classDef bad fill:#4c3a3a,stroke:#bf616a,color:#e5e9f0
+  class PR prod
+  class A1,A2,A3,A4,A5 lab
+  class GS,CI,FH gate
+  class SH,PM good
+  class RJ bad
+```
 
 The model critiquing itself does not work. What does is that this architecture already generates
 five free label sources: **grounding-gate rejections** (zero cost, mechanical, immediate), the
@@ -394,7 +611,71 @@ fires — which matters because volume spikes exactly when the system is most va
 
 ---
 
-## 14. The kill battery: cheap tests that can end this before any modelling
+## 14. Deployment topology
+
+```mermaid
+flowchart TB
+  subgraph EDGE[Edge]
+    ST([Static site<br/>Pages])
+  end
+  subgraph APP[Application]
+    API([FastAPI<br/>read paths])
+    WRK([Workers<br/>poll, extract, gate])
+    GR([LangGraph runtime<br/>checkpointed agents])
+  end
+  subgraph STATE[State]
+    PGD[(Postgres<br/>claims + pgvector)]
+    RDS[(Redis<br/>online features)]
+    OBJ[(Object store<br/>immutable snapshots)]
+  end
+  subgraph EXTN[External]
+    MOD([Model APIs<br/>triage / extract / embed])
+    FEED([GDELT, ICE, CFTC, USDA])
+  end
+  ST --> API
+  API --> PGD
+  API --> RDS
+  API --> GR
+  WRK --> FEED
+  WRK --> OBJ
+  WRK --> MOD
+  WRK --> PGD
+  GR --> MOD
+  GR --> PGD
+  OBS([Traces, metrics, cost]) -.-> WRK
+  OBS -.-> GR
+  OBS -.-> API
+  classDef edge fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef app fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
+  classDef store fill:#4a3b52,stroke:#b48ead,color:#e5e9f0
+  classDef ext fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
+  class ST edge
+  class API,WRK,GR app
+  class PGD,RDS,OBJ store
+  class MOD,FEED,OBS ext
+```
+
+**Three properties this topology is chosen for.**
+
+**No third party sits on the request path.** Workers poll feeds and models on their own schedule
+and write to Postgres; the API only ever reads. A throttled or failing upstream degrades
+freshness, which the payload reports, rather than returning an error to a trader.
+
+**The state layer is one database plus a cache.** Claims, embeddings and features share a
+transaction boundary, which is what makes an embedding and the claim citing it commit together.
+Object storage holds immutable snapshots because they are write-once and large.
+
+**Observability spans all three compute components**, and the trace id it emits is written into
+the claim row — otherwise an outcome arriving six weeks later has nothing to attribute to.
+
+**Scaling order**, when it is needed: workers scale horizontally first (they are stateless), then
+Postgres gains read replicas, then the vector index moves out. Ingestion becomes a real broker
+only when three or more independent consumers need replay — not for throughput, which one box
+handles at these volumes.
+
+---
+
+## 15. The kill battery: cheap tests that can end this before any modelling
 
 | | Test | Kill if | Cost |
 |---|---|---|---|
@@ -406,7 +687,7 @@ fires — which matters because volume spikes exactly when the system is most va
 corpus that is a stop, and it needed no price data. Reported rather than quietly widened, because
 a battery you only run until it passes is not a battery.
 
-## 15. What this deliberately does not build
+## 16. What this deliberately does not build
 
 Streaming infrastructure (116 msg/sec is one box); a dedicated vector database; a feature-store
 product; a fine-tuned extractor; multi-agent debate; conversational memory; self-hosted
