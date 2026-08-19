@@ -220,50 +220,124 @@ passing.
 
 ---
 
-## 3. Retrieval: for memory, not for context
+## 3. Retrieval: for memory, not for context — and three of the four jobs are not search
 
 **The extractor gets no retrieval.** The document is the input; adding retrieved passages to its
-prompt invites it to cite text the source never contained, which is precisely what the grounding
+prompt invites it to cite text the source never contained, which is exactly what the grounding
 gate exists to catch. Naive designs use RAG to feed the extractor. Here that is a defect.
 
-Retrieval serves four jobs the document genuinely cannot answer about itself:
+Retrieval instead serves four jobs the document cannot answer about itself — and the important
+finding is that **only one of the four is actually vector search.** Treating them as one thing is
+where most designs go wrong.
 
 ```mermaid
 flowchart TB
   D([New document]) --> X([Extractor<br/>NO retrieval])
   X --> C([Raw claim])
-  C --> R1([Novelty<br/>ANN over claim vectors])
-  C --> R2([Entity resolution<br/>alias + vector over canon])
-  C --> R3([History<br/>this region, 18 months])
-  C --> R4([Corroboration<br/>independent sources])
+  C --> R1([Novelty<br/>MinHash + LSH])
+  C --> R2([Entity resolution<br/>alias table + fuzzy])
+  C --> R3([History<br/>WHERE clause])
+  C --> R4([Corroboration<br/>hybrid + independence])
   R1 --> S([Scored claim])
   R2 --> S
   R3 --> S
   R4 --> S
   classDef doc fill:#3b4252,stroke:#81a1c1,color:#e5e9f0
+  classDef cheap fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
   classDef ret fill:#4a4433,stroke:#ebcb8b,color:#e5e9f0
-  classDef out fill:#3a4a3a,stroke:#a3be8c,color:#e5e9f0
   class D,X,C doc
-  class R1,R2,R3,R4 ret
-  class S out
+  class R1,R2,R3 cheap
+  class R4,S ret
 ```
 
-| Job | Query | Index | Why not a join |
-|---|---|---|---|
-| **Novelty** | the new claim | claim embeddings, last 90 days | "Frost in Minas" and "freezing temperatures across MG" are the same claim in different words. Exact match sees two |
-| **Entity resolution** | the surface mention | canonical entities + aliases, temporal validity | "Sul de Minas", "South Minas", "MG south" all resolve to one region. This is the moat (see EDGE.md §6) and it is mostly alias tables with vectors as fallback |
-| **History** | region + driver | claims, by entity | The confidence model needs "this region produced four frost claims in 18 months, three of which never appeared in official data" |
-| **Corroboration** | the claim | claims across publishers | Independent sourcing, which requires publisher-independence, not text similarity — syndication looks like corroboration and is not |
+| Job | What it actually is | Why not vector search |
+|---|---|---|
+| **Novelty** | **Near-duplicate detection** — MinHash/SimHash over shingled claim text, LSH banding, gated by entity and a 90-day window | Cosine similarity conflates "same fact restated" with "related but distinct," and that is precisely the boundary that must stay sharp. Embeddings are a *second pass* for claims that survive dedup — a new number for the same entity where the surface text genuinely differs |
+| **Entity resolution** | **Record linkage** — alias table plus fuzzy string match (edit distance / Jaro-Winkler) | Mentions are short, ambiguous and often misspelled, which is where embeddings are weakest and exact-alias lookup is strongest. The alias table resolves most mentions in microseconds. Embeddings are fallback candidate generation for unseen surface forms, **never auto-accept** — and every resolved match is written back, so the system gets cheaper over time |
+| **History** | **A `WHERE` clause** — `(entity_id, claim_type, time_range)` on an indexed table | Not retrieval in any sense. Routing it through the search layer adds latency and imprecision to a job that is naturally exact and fast |
+| **Corroboration** | **The only genuine hybrid search** — candidate generation, then a publisher-independence filter | And the filter is the whole ballgame, not the retrieval (below) |
 
-**Sizing is the point.** At 4.7 tradeable documents a day, the claim index is thousands of
-vectors, not millions. `pgvector` with an HNSW index in the same Postgres as the claims, so an
-embedding and the claim citing it commit in one transaction. A dedicated vector database here
-buys a second consistency boundary and an extra service to operate.
+### Hybrid search: worth it, for a narrower reason than the hype
 
-**Corroboration is the trap.** Two documents saying the same thing are evidence only if the
-publishers are independent. Retrieval by text similarity returns syndicated copies first —
-they are the most similar text in the corpus. So corroboration filters on publisher lineage
-before counting, and the count is of *independent* sources, never of documents.
+BEIR (Thakur et al., NeurIPS 2021) is the right reference and its finding is specific. **BM25 is a
+strong zero-shot baseline out of domain** and frequently beats dense bi-encoders that were not
+trained on the domain's vocabulary — Touché-2020 BM25 ≈0.367 vs DPR ≈0.131, ArguAna ≈0.315 vs
+≈0.175. Dense wins where the task sits near its training distribution.
+
+The failure modes are disjoint, and that is the actual argument:
+
+- **BM25 fails** on synonym and paraphrase mismatch — it cannot connect "Sul de Minas" to "South
+  of Minas" unless the string is literally there.
+- **Dense fails** on rare tokens it was never trained to represent — **commodity jargon, ICE/CME
+  contract codes, lot numbers, exact figures, out-of-vocabulary proper nouns.** Which is what a
+  commodity corpus is made of.
+
+**But do not oversell the fusion step.** On a real e-commerce benchmark: BM25 alone 0.6983 nDCG,
+dense alone 0.6953, RRF-fused **0.7068** — the fusion itself buys about **1–1.7%**. Hybrid is
+insurance against two disjoint failure modes at near-zero extra cost, not a silver bullet.
+
+**Fusion: RRF now, tuned convex combination later.** RRF is `Σ 1/(k + rank)` with **k=60**, the
+default in Elasticsearch, OpenSearch, Azure AI Search and Qdrant. Its virtue is needing no score
+reconciliation between an unbounded BM25 score and a bounded cosine. Its cost is real: Bruch et
+al. (*ACM TOIS* 2023) show a **tuned convex combination of normalised scores beats RRF both in and
+out of domain**, because rank position discards confidence — a slam-dunk keyword match and a
+borderline one both collapse to "rank 1." Start with RRF because there is no labelled relevance
+set on day one; move to convex combination once corroboration accept/reject decisions have
+supplied one, which they will.
+
+**BM25 parameters stay at defaults.** `k1=1.2`, `b=0.75`. Elastic's own guidance is that tuning is
+a last resort after synonyms, stemming and field boosting. The one real question here is the
+length mismatch — a 200-character GDELT snippet against a 40-page analyst PDF in one index — and
+the answer is not to compromise `b`: chunk the PDF (§2) so retrieval units are the same order of
+magnitude, or use per-field similarity. A single compromised `b` under-penalises short-document
+term stuffing and over-penalises legitimate long-document length simultaneously. Skip BM25+,
+BM25L and BM25S — they solve extreme-length and slow-implementation problems this corpus does not
+have.
+
+### Reranking: no, for three of the four jobs, and it would actively harm two
+
+Cross-encoder rerankers are trained on *"does this passage answer this query."* That is not what
+these jobs ask, and the mismatch is not academic:
+
+- **Novelty — inverted.** A reranker ranks the near-duplicate as most relevant, which is exactly
+  the thing that must not be surfaced as new.
+- **Corroboration — blind to the only thing that matters.** It has no notion of publisher
+  independence and will rank two syndicated copies of one wire story as mutually relevant.
+- **History — irrelevant.** Reranking a time-ordered list of one entity's own past claims adds
+  latency for nothing.
+
+Published lift is real where the task matches — roughly +12% nDCG average on BEIR on top of
+hybrid, and Anthropic's contextual-retrieval numbers show reranking taking top-20 failure from
+2.9% to 1.9%. **The one place it earns its cost here** is disambiguating a short (5–20) candidate
+list from entity resolution, where "which canonical region is most consistent with the surrounding
+claim text" is a genuine relevance question. Everywhere else, skip it — and note latency scales
+roughly linearly in candidate count, so cost, not a quality plateau, sets K.
+
+### Corroboration is data engineering, not a better model
+
+Candidate generation is the easy half. The hard half is that **syndication is systematic** — wire
+services, republished releases, aggregator scrapes — so counting documents counts one fact many
+times, and text-similarity retrieval returns exactly those copies first because they are the most
+similar text in the corpus.
+
+What makes corroboration work is a **publisher/syndication graph**: known mirror relationships,
+byline and timestamp clustering, copies collapsed before counting. The corroboration count is only
+as good as that graph. A smarter embedding model or a reranker here solves the wrong 20%.
+
+### Sizing
+
+At 1–4M documents and low millions of claims, **pgvector with HNSW in the same Postgres as the
+claims** — so an embedding and the claim citing it commit in one transaction. A dedicated vector
+database solves a scale problem this corpus does not have.
+
+**What is deliberately not built:** late chunking (vendor lock-in to token-level embedding output,
+gains of ~1–6 nDCG points that grow with document length we mostly sidestep by extracting claims
+first), small-to-big and sentence-window retrieval (built for QA over documents, unmeasured even
+there, and we retrieve claims rather than answer questions), a hand-rolled BM25F, LLM-as-reranker,
+and embedding-first entity resolution. If chunk-context loss does bite, **Anthropic's contextual
+retrieval** is the cheap portable fix — an LLM-generated one-line context prefix per chunk, which
+took top-20 retrieval failure from 5.7% to 3.7%, and to 2.9% with contextual BM25 — because it
+works with any embedding stack instead of requiring a new architecture.
 
 ---
 
