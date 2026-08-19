@@ -209,6 +209,45 @@ because they are exactly the shape this system should be built to catch and the 
 structurally cannot: **dated, mechanical, forward-known changes to contract economics, published
 in primary documents nobody parses.**
 
+## The retrospective replay, run
+
+`signals/replay.py` replays the detector over the archive point-in-time, with every threshold
+fixed before any outcome was computed. **The ICE file for date D was published on D and is never
+revised**, so fetching it today returns exactly what a desk saw that afternoon — which is what
+makes this replay meaningful rather than decorative. GDELT rewrites its archive and USDA PSD
+serves only the current vintage; neither could support this test.
+
+Over 156 observations, September 2023 to May 2025:
+
+```
+PENDING_SURGE     2 alerts over 1.7 years
+STOCK_CLIFF       1 alert
+
+2023-12-06  STOCK_CLIFF     context        certified 337,915 -> 234,699 in 20 sessions
+2023-12-11  PENDING_SURGE   stocks REBUILD pending 25,958 vs trailing median 8,365
+2024-01-25  PENDING_SURGE   stocks REBUILD pending 65,278 vs trailing median 21,436
+
+directional test, 42 sessions:  2023-12-11 -> +26.2%  hit
+                                2024-01-25 -> +255.3% hit
+                                2/2
+```
+
+**Three alerts in 1.7 years** is the first useful result — an alert rate a human can actually
+read, which is the binding constraint on any monitoring system. It caught the December 2023
+cliff as context and then called both rebuilds.
+
+**And 2 of 2 is inside the coin-flip band.** With n = 2 the 95% interval on a fair coin runs
+−0.4 to 2.4 hits, so a 100% hit rate here is not evidence of anything, and the harness prints the
+band beside the number so it cannot be quoted without it. What the replay demonstrates is that
+**the detector fires on the right dates for the right reasons, deterministically, with no model
+in the loop** — not that the signal pays.
+
+Two limits on this run, both real: the cached series is irregularly sampled (dense around the
+2023 window, weekly elsewhere), so "42 sessions" is not 42 uniform trading days; and **the
+lead-time claim — how far ahead of the trade commentary these alerts fired — is unmeasured**,
+because establishing the commentary dates is a separate research task that has not completed.
+Until it does, this is a detection result without its comparison arm.
+
 ## Reproducing it
 
 ```bash
