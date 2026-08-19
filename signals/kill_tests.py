@@ -23,7 +23,14 @@ PRICE_URL = ("https://query1.finance.yahoo.com/v8/finance/chart/KC%3DF"
 
 
 def kc_closes() -> dict[str, float]:
-    """ICE Coffee C front month, daily settle. Free, no key."""
+    """ICE Coffee C front month, daily settle. Free, no key.
+
+    NOTE: this is a spliced CONTINUOUS series, not one contract. Log returns
+    computed across a roll date include the contract spread rather than price
+    action, and arabica rolls are large under backwardation. K2 below therefore
+    has a known contamination on top of its already-fatal sample size. Fixing it
+    needs a single-contract series or a ratio-adjusted splice; neither is free.
+    """
     req = urllib.request.Request(PRICE_URL, headers={"User-Agent": "Mozilla/5.0"})
     # macOS python ships without a CA bundle wired in; use certifi when present.
     try:

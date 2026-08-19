@@ -75,6 +75,14 @@ Prices went up while stocks collapsed, and up again while stocks nearly tripled.
 window the certified stock level was **not** what set the price. The 2023–24 Brazilian and
 Vietnamese supply story was, and it ran straight through both halves.
 
+**A caveat on those two percentages.** `KC=F` is a spliced continuous front-month series, so a
+change measured across a roll date includes the contract spread as well as the price move. Both
+windows above span rolls, and arabica rolls are large — backwardation has been extreme. The
+*levels* are sound (an independent check reproduces a known record settlement to the cent) and
+the *direction* is not in doubt: prices rose in both halves either way, which is the whole
+point. But the precise magnitudes should not be quoted as clean returns. A single-contract
+series, or a ratio-adjusted splice, is required before anyone puts a number on the edge.
+
 ---
 
 ## What this actually demonstrates
@@ -115,7 +123,14 @@ no amount of statistical sophistication recovers the context.
 - **The price leg is reported as a negative result and should stay that way.** If a later test
   finds an edge here, the burden is on that test.
 - `KC=F` is a spliced continuous front-month series with roll discontinuities, not official ICE
-  settlements.
+  settlements. Any differenced analysis on it picks up artificial jumps at roll boundaries; the
+  kill battery's K2 has this exposure and it is one more reason its n=6 result is reported as a
+  harness check rather than a finding.
+- **Regime breaks contaminate the obvious follow-up window.** A 2025 replication would straddle
+  a tariff imposed in August and removed in November, during which certified stocks fell ~52% and
+  turned up the month the tariff went. Stock and price are jointly driven by the policy event
+  there, so a naive lead-lag reads a common cause as one leading the other. That window needs a
+  regime split, not a longer sample.
 - Backfill `ingest_time` is not recoverable. The file's internal `As of:` stamp is the event
   time; a defensible ingest clock for archaeology is the next business morning, which
   deliberately discards up to a session of edge.
