@@ -395,6 +395,7 @@ const ROUTES = {
   "#/cost-doc": { doc: "COST.md", surface: "paper" },
   "#/case": { doc: "CASE_STUDY.md", surface: "paper" },
   "#/orchestration": { doc: "ORCHESTRATION.md", surface: "paper" },
+  "#/sources": { doc: "SOURCES.md", surface: "paper" },
   "#/measurements": { doc: "MEASUREMENTS.md", surface: "paper" },
 };
 
