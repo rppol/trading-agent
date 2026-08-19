@@ -11,6 +11,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     i = sub.add_parser("ingest"); i.add_argument("--batches", type=int, default=96)
     e = sub.add_parser("extract"); e.add_argument("--backend", default="claude-cli")
+    sub.add_parser("restore")
     a = ap.parse_args()
     conn = connect()
 
@@ -26,6 +27,20 @@ def main():
                 f.write(json.dumps(d) + "\n")
         print(json.dumps({"seen": len(docs), "new": new,
                           "clusters": len({d['cluster_id'] for d in docs})}))
+
+    elif a.cmd == "restore":
+        # A fresh clone has no data/ directory (it is gitignored), so `make export`
+        # produced an empty site while the README claimed it replayed the fixtures.
+        # The only restore path lived inside the CI workflow. This is that path.
+        docs = [json.loads(l) for l in open("fixtures/documents.jsonl")]
+        n = upsert_documents(conn, docs)
+        for d in docs:
+            conn.execute("UPDATE documents SET cluster_id=?, novelty=? WHERE doc_id=?",
+                         (d["cluster_id"], d["novelty"], d["doc_id"]))
+        conn.commit()
+        claims = [json.loads(l) for l in open("fixtures/claims.jsonl")]
+        m = insert_claims(conn, claims)
+        print(json.dumps({"documents": n, "claims_offered": len(claims), "claims_landed": m}))
 
     elif a.cmd == "extract":
         docs = [json.loads(l) for l in open("fixtures/documents.jsonl")]

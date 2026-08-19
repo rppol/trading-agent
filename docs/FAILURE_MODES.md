@@ -100,8 +100,8 @@ The system ends up tracking press-release distribution, which correlates with no
 tradeable. Worse, the same story landing in both train and test folds inflates every
 validation metric.
 
-**Measured here.** Deduplication collapsed a 50-document corpus into **24 clusters**. Half
-the corpus was echo.
+**Measured here.** Deduplication collapses the 33-document corpus into **29 clusters** — a
+dedup ratio of 0.121, so **12% is echo** ([MEASUREMENTS.md](MEASUREMENTS.md)).
 
 **Detection.** Cluster-to-document ratio per window. A sudden move toward 1.0 means the
 deduplicator has stopped working; a move toward 0.1 means a syndication storm.

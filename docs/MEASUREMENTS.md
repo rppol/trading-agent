@@ -19,7 +19,7 @@ dead numbers. A number with three homes has no home.
 | **Survives the market filter** | **33 total, 4.7/day** | the corpus the prototype extracts from |
 | Cheap filter removal rate | **95%** | of coffee-mentioning documents, before any model runs |
 | Dedup: documents -> clusters | **33 -> 29** | dedup ratio **0.121**, i.e. 12% echo |
-| Claims extracted | 13 | after both grounding gates |
+| Claims extracted | 13 | after both grounding gates (one was silently lost to a colliding id until 2026-08-19) |
 | Extraction cost | **$0.76** for 33 documents | ~$0.023/document via the `claude -p` CLI |
 | GDELT filename vs publication | **label is ~9.8 min ahead** | HEAD `Last-Modified` across consecutive batches |
 
@@ -31,8 +31,8 @@ dead numbers. A number with three homes has no home.
 | Cecafe, Conab, ICO | **0** |
 | Comunicaffe, Perfect Daily Grind, Barchart, StoneX, Platts | **0** |
 | Noticias Agricolas, Globo Rural, Valor | **0** |
-| Bloomberg | 189 |
-| Argus Media | 39 |
+| Bloomberg | **0** (the 189 once reported were all `bnnbloomberg.ca`) |
+| Argus Media | 39 (`argusmedia` subdomains) |
 | Fastmarkets | 15 |
 | Daily Coffee News | 11 |
 | `iheart.com` (radio syndication) | **52,439 — 7.8% of the corpus** |

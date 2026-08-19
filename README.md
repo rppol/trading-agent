@@ -23,11 +23,12 @@ cached queries and minutes for fresh inference.
 
 ## The short version
 
-**The headline finding is that GDELT does not contain the signal.** Measured over 675,840
-documents and 8,383 domains in seven days: Reuters zero, Cecafé zero, Conab zero, ICO zero,
-every coffee trade publication zero — while a radio syndication network supplies 7.8% of the
-corpus. Under five "tradeable" coffee documents a day survive — the false-positive floor, not
-thin signal. This is an acquisition problem, not an NLP one, and no extraction quality fixes it.
+**Wire services and primary institutions are absent from GDELT as identified sources.**
+`reuters.com`, `apnews.com`, `bloomberg.com`, Cecafé, Conab and the ICO return zero documents
+across 675,840. Their content arrives only as syndicated republication — second-hand, delayed,
+and stripped of the attribution you would weight it by. An earlier draft concluded from this
+that the signal was simply absent; that was wrong, and the correction is the first section of
+[the architecture document](docs/ARCHITECTURE.md).
 
 **The volumes in the brief are a misdirection.** 10M AIS pings/day is 116 messages a second.
 500 documents a day is about $9 of tokens. Only the imagery is genuinely large, and its cost
@@ -49,7 +50,7 @@ the defence against planted news.
 ## Run it
 
 ```bash
-make setup                 # uv venv + fastapi, uvicorn. Everything else is stdlib
+make setup                 # uv venv + deps (uv must be on PATH)
 make test                  # 7 assert-based checks, no framework
 
 make export && make serve  # replay the committed fixtures, serve API + site on :8000

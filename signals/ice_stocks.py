@@ -64,8 +64,13 @@ def fetch(d: date) -> bytes | None:
             return b
         except urllib.error.HTTPError as e:
             if e.code == 404:
-                # Genuine absence -- a weekend or exchange holiday. Safe to cache.
-                key.write_bytes(b"")
+                # A 404 is NOT proof of a holiday. ICE publishes late in the session,
+                # so today's file 404s all morning on a normal trading day -- and an
+                # earlier version cached that permanently, marking live sessions as
+                # holidays forever. Only cache a 404 for a date old enough that
+                # non-publication is settled.
+                if (date.today() - d).days >= 3:
+                    key.write_bytes(b"")
                 return None
             time.sleep(2 * (attempt + 1))
         except Exception:
@@ -109,6 +114,12 @@ def parse(blob: bytes) -> dict | None:
             # a later section header ends this one
             if i > start and any(h.search(" ".join(c for c in rows[i] if c).strip())
                                  for h in SECTIONS.values()):
+                break
+            if "No Grading Pending" in " ".join(cells):
+                # An EMPTY queue is the most informative state this file has -- it
+                # predicts continued drawdown. Returning None made it indistinguishable
+                # from a parse failure and dropped exactly those observations.
+                out[key] = 0
                 break
             if cells[0].startswith("Total in Bags"):
                 nums = [c for c in cells if re.fullmatch(r"-?\d+\.?\d*", c)]

@@ -33,38 +33,43 @@ Everything except imagery fits comfortably on one well-chosen machine. Imagery i
 
 Year 1, decisions taken as described in [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Footprint: 200 areas of interest at 4 km² each, 200k text items/day, 1 TB/day of imagery.
+Footprint: 200 areas of interest at 4 km² each, 200k text items/day, 1 TB/day of imagery,
+10 commodities. All figures resolve to [MEASUREMENTS.md](MEASUREMENTS.md) or to the sources cited
+in §6.
 
-| Line | $/month | Share |
+**Engineering cost is the largest single line and it is a business decision, not a technical
+one**, so it is shown as a range rather than smuggled in as a constant. An earlier version of
+this table used $30,000/month for five engineers — $72,000 a year fully loaded each — which holds
+only at offshore rates and was never stated as an assumption.
+
+| Line | Offshore team | US/UK team |
 |---|---:|---:|
-| People — 5 engineers (see note) | 30,000 | 39.9% |
-| AIS licence — commercial S-AIS | 20,000 | 26.6% |
-| Exchange data + derived-data licences | 12,000 | 16.0% |
-| Satellite tasking — 30 triggered events | 6,000 | 8.0% |
-| Cloud infra — compute, streaming, DB | 4,000 | 5.3% |
-| Object storage — 90% tiered to archive | 2,153 | 2.9% |
-| GPU — vision, AOI-scoped only | 700 | 0.9% |
-| ASR — transcripts | 60 | 0.1% |
-| **LLM tokens — every text source** | **294** | **0.4%** |
-| **Total** | **75,208** | |
+| **People — 5 engineers** | **30,000** | **125,000** |
+| **Derived-data licensing, 10 commodities** (§6) | **22,825** | 22,825 |
+| AIS licence — commercial S-AIS | 20,000 | 20,000 |
+| Exchange data, non-display | 12,000 | 12,000 |
+| Satellite tasking — 30 triggered events | 6,000 | 6,000 |
+| Cloud infra | 4,000 | 4,000 |
+| Object storage — 90% tiered | 2,153 | 2,153 |
+| Evaluation: golden set upkeep + CI (§7) | 1,900 | 1,900 |
+| GPU — vision, AOI-scoped | 700 | 700 |
+| ASR | 60 | 60 |
+| **LLM tokens — every text source** | **196** | **196** |
+| **Total** | **~99,800** | **~194,800** |
 
-**Data licences 51%. People 40%. All compute and inference together under 10%.**
+Three things changed from the earlier published table, and they change the headline:
 
-**The people line is the weakest number in this table and it inverts the headline.** $30,000 a
-month for five engineers is **$72,000 a year fully loaded each**, which holds only at offshore
-rates and is not stated as an assumption. At a realistic $250–400k fully loaded, the monthly
-total becomes ~$170,000 and the split flips to **people 73%, data licences 22%.** The finding
-that survives either way — and in fact strengthens — is that **the LLM is the cheapest line in
-the system**, falling from 0.4% to 0.17%. The licences-versus-people framing does not survive,
-and is corrected here rather than defended.
+1. **Derived-data licensing was absent** and is the second-largest line. §1a says viability needs
+   20–40 commodities; at just 10, CME's per-instrument schedule is ~$274k/year.
+2. **The token price was wrong.** The workhorse model is $2/$10 per million, not $3/$15, so the
+   LLM line falls from $294 to **$196**.
+3. **Evaluation infrastructure was uncosted** at $1,900/month — which is roughly **ten times the
+   inference it governs**, and correct, because the tokens are not what can hurt you.
 
-**A second collision, between this table and §1a.** The breadth argument says viability needs
-20–40 commodities. The derived-data schedule below prices per instrument. At 24 commodities,
-CME derived-data licensing alone is roughly **$534,000/year — about 59% of this entire staged
-budget**, and the $75,208 figure understates by well over half. The two halves of this document
-were never priced together, and doing so is the single most useful correction available to it.
-
----
+**The surviving headline: the LLM is 0.2% of the bill on the offshore assumption and 0.1% on the
+other.** It got *cheaper* relative to everything else, not dearer. What moved is that
+**licensing and people are now 53–76%** between them, so the earlier "data licences 51%, people
+40%" framing does not survive contact with a realistic salary line.
 
 ## 3. The naive version of the identical system
 
@@ -79,7 +84,7 @@ three policies chosen carelessly:
 | Text routing — every item to a frontier model vs 95% on a small model | 3,600 | 294 | **12×** |
 | Storage — S3 Standard untiered vs 90% tiered to archive | 8,395 | 2,153 | **3.9×** |
 
-**Naive total: $318,755/month. Staged: $75,208/month. Just over fourfold.**
+**Naive total: $318,755/month against a staged ~$99,800 on the same offshore assumption — just over threefold.** The ratio fell because the staged column now carries the derived-data licensing that was missing from it, not because any policy changed.
 
 Two things worth saying plainly about that number.
 
@@ -158,6 +163,9 @@ Not an estimate — metered from the runs:
 | Implied per-document | ~$0.023 |
 | Projected at the measured 4.7 tradeable docs/day | **~$0.11/day** |
 | Projected across 20 commodities at the same rate | **~$2.20/day** |
+
+The $1.08/day figure quoted in §4 is the same quantity computed before the funnel was
+re-measured; **$0.11/day is the current number** and §4's is superseded.
 
 Roughly **$3/month** to run the text half of this system for one commodity at the measured
 volume — and note how small that makes every token-optimisation argument. The AIS licence
@@ -262,14 +270,12 @@ Honest omissions, each of which can dominate:
 |---|---|
 | Golden set: 1,300 documents, double-annotated with adjudication | **~$28,000 one-off** |
 | Drift canary, quarterly re-adjudication, CI eval compute | **~$1,900/month** |
-| The LLM tokens all of that governs | **~$100/month** |
+| The LLM tokens all of that governs | **~$196/month** |
 
-That ratio looks absurd and it is correct, because the tokens are not what can hurt you. It is
+A roughly tenfold ratio, and it is correct, because the tokens are not what can hurt you. It is
 also the line teams forget, and then quietly stop running evals when someone notices the bill.
 
-Two related corrections to the model above. The workhorse model's price is **$2/$10 per million
-tokens, not $3/$15** — an introductory rate that was made permanent, so any figure built on the
-higher number is a third too pessimistic. And **fine-tuning is not worth it**: the compute is ~$35,
+**Fine-tuning is not worth it**: the compute is ~$35,
 but 30,000 double-annotated extraction examples cost **~$224,000** in labelling. Against a ~$70/month
 inference bill the payback never arrives. The trigger that would change this is not volume — it is
 a licence forbidding third-party APIs, which given the clauses above is the likeliest one to fire.

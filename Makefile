@@ -10,12 +10,24 @@ ingest:            ## pull GDELT GKG batches into the store (BATCHES=672 for 7 d
 extract:           ## run the LLM over stored documents (BACKEND=claude-cli|replay)
 	$(PY) -m signals.cli extract --backend $(or $(BACKEND),claude-cli)
 
-export:            ## emit web/data/*.json and stage docs for the site
+restore:           ## load the committed fixtures into a fresh store
+	$(PY) -m signals.cli restore
+
+export: restore    ## emit web/data/*.json and stage docs for the site
 	$(PY) -m signals.export
 	mkdir -p web/docs && cp docs/*.md web/docs/
 
 serve:             ## API + site on :8000
 	.venv/bin/uvicorn signals.api:app --port 8000 --reload
+
+positioning:       ## CFTC Commitments of Traders (free, no key)
+	$(PY) -m signals.positioning
+
+stocks:            ## ICE certified coffee stocks (free, deterministic URL)
+	$(PY) -m signals.ice_stocks 30
+
+kill:              ## run the kill battery against real prices
+	$(PY) -m signals.kill_tests
 
 test:
 	$(PY) tests/test_pipeline.py

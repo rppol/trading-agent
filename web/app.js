@@ -6,7 +6,12 @@
 
 const SIGNALS = ["supply_risk", "price_pressure", "policy_shock"];
 const LABEL = { supply_risk: "Supply risk", price_pressure: "Price pressure", policy_shock: "Policy shock" };
-const HALFLIFE_D = 5.0;
+// Must mirror signals/pipeline.py:HALFLIFE_D exactly. A single global constant
+// lived here after Python moved to per-signal decay, so the published site scored
+// policy_shock with a 5-day half-life against the API's 45 and quietly disagreed
+// with its own documentation.
+const HALFLIFE_D = { supply_risk: 5.0, price_pressure: 2.0, policy_shock: 45.0 };
+const BALANCE_SIGN = { tighter: 1, looser: -1, neutral: 0 };
 
 let DATA = { claims: [], docs: [], meta: null };
 let mermaidLib = null;
@@ -22,10 +27,15 @@ function score(claims, asOf) {
   const out = {};
   for (const sig of SIGNALS) {
     let num = 0, den = 0, n = 0;
+    const hl = HALFLIFE_D[sig];
     for (const c of claims) {
       if (c.signal !== sig || c.injection_flag) continue;
-      const age = Math.max((ref - new Date(c.event_time)) / 86400000, 0);
-      const w = Math.pow(0.5, age / HALFLIFE_D) * (c.confidence || 0) * (c.novelty ?? 1);
+      const ageD = (ref - new Date(c.event_time)) / 86400000;
+      // A publisher-declared event_time in the future used to clamp to age 0, i.e.
+      // maximum weight forever. Mirrors the guard in pipeline.py:score().
+      if (ageD < -0.02) continue;
+      const age = Math.max(ageD, 0);
+      const w = Math.pow(0.5, age / hl) * (c.confidence || 0) * (c.novelty ?? 1);
       if (w <= 0) continue;
       const v = (c.magnitude || 0) * (sig === "price_pressure" ? (c.direction || 0) : 1);
       num += w * v; den += w; n++;
@@ -232,7 +242,7 @@ function viewSignals() {
 
 function bindSignals() {
   const times = DATA.claims.flatMap(c => [c.ingest_time, c.event_time]).sort();
-  const set = (k, v) => { window[k] = v; render(); };
+  const set = (k, v) => { window[k] = v; window.__inPlace = true; render(); };
   $("#b-honest")?.addEventListener("click", () => set("__clock", "honest"));
   $("#b-leaky")?.addEventListener("click", () => set("__clock", "leaky"));
   $("#asof")?.addEventListener("input", e => set("__asOf", times[+e.target.value]));
@@ -317,6 +327,7 @@ function viewCost() {
 function bindCost() {
   Object.keys(COST).forEach(k => $("#c-" + k)?.addEventListener("input", e => {
     window.__cost = { ...(window.__cost || {}), [k]: +e.target.value };
+    window.__inPlace = true;
     render();
   }));
 }
@@ -394,9 +405,15 @@ async function render() {
   document.querySelectorAll("nav.tabs a").forEach(a =>
     a.toggleAttribute("aria-current", a.getAttribute("href") === hash));
   const view = $("#view");
+  const keepScroll = window.__inPlace;
+  const y = window.scrollY;
   view.innerHTML = r.doc ? await viewDoc(r.doc) : r.render();
   r.bind?.();
-  if (!window.__scrolled) window.scrollTo(0, 0);
+  // Only reset scroll on an actual route change. Re-rendering in place (dragging a
+  // slider, flipping the leakage switch) used to replace the DOM node under the
+  // cursor AND jump to the top, so the interactive arguments could not be dragged.
+  if (keepScroll) { window.scrollTo(0, y); window.__inPlace = false; }
+  else window.scrollTo(0, 0);
 }
 
 async function boot() {

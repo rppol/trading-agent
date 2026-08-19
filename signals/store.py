@@ -108,8 +108,9 @@ def insert_claims(conn, claims: list[dict]) -> int:
     overwrote the existing row AND its ingest_time, destroying the record of what
     was known when. Claim ids carry the extractor version, so a re-extraction now
     lands as a NEW row alongside the old one, which is what a correction is."""
+    landed = 0
     for c in claims:
-        conn.execute(
+        cur = conn.execute(
             """INSERT OR IGNORE INTO claims
                (claim_id,doc_id,signal,direction,magnitude,confidence,horizon_days,
                 driver,region,contract,evidence_quote,injection_flag,verified_number,
@@ -123,8 +124,11 @@ def insert_claims(conn, claims: list[dict]) -> int:
              c.get("ingest_time") or now(), c["extractor"],
              json.dumps(c.get("payload", {}), separators=(",", ":"))),
         )
+        landed += cur.rowcount
     conn.commit()
-    return len(claims)
+    # Return what LANDED, not what was offered. Returning len(claims) reported 13
+    # while 12 rows existed, and every downstream count inherited the lie.
+    return landed
 
 
 def claims_as_of(conn, as_of: str | None = None, signal: str | None = None) -> list[sqlite3.Row]:

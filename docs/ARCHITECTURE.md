@@ -192,7 +192,14 @@ costs to the same signal twice.
 ### What the corrected arithmetic actually says
 
 At IC ≈ 0.030 net, coffee alone on a daily signal gives `0.030 x sqrt(252)` ≈ **0.48** — not a
-great book, but **not the "negative by a factor of two to six" the earlier draft asserted.** The
+great book, but **not the "negative by a factor of two to six" the earlier draft asserted.**
+
+Note the frequency mismatch this creates, because it matters and is easy to miss: the 0.48
+figure is a **daily** rebalance, while the ceiling derived below is a **weekly** one. They are
+not comparable, and the honest reading is that rebalance frequency, not commodity count, is the
+larger lever — which the transaction-cost table immediately qualifies, since daily turnover is
+what the costs punish. The two constraints bind against each other, and neither section alone
+gives the answer. The
 drag itself was also overstated: it assumed 252 full round trips a year, which presumes a signal
 with zero persistence flipping sign daily; realistic turnover of 30–50% puts the drag nearer
 0.15–0.30 than 0.58.
@@ -935,9 +942,12 @@ infrastructure and no edge is a more expensive failure than a spreadsheet.
 
 ### And the likelier product, stated plainly
 
-At the information coefficient the literature actually supports, a coffee-only signal needs
-roughly **460 years** of forward data to separate from zero. Twenty-four commodities brings that
-to about **19 years** — which is precisely why the published study needed 2003–2021. Forward
+At the correlation-adjusted information coefficient of §1a (~0.030, not the 0.0127 an earlier
+draft used), a coffee-only signal needs roughly **80 years** of forward data to separate from
+zero, and twenty-four commodities roughly **3–4 years**. Both figures are far softer than the
+earlier draft's 460 and 19, and the conclusion survives only in its weaker form: forward testing
+on one commodity is still hopeless, but a multi-commodity book is testable on a horizon a
+business could actually wait out. Forward
 testing is arithmetically hopeless; only a point-in-time news **archive** buys enough calendar
 time to decide this decade, which makes archive acquisition the critical path, ahead of
 extraction quality.
@@ -989,8 +999,9 @@ starvation failure, implemented deliberately.
 - **No self-hosted model at this volume.** See above.
 - **No fused multi-signal score.** The three signals decay differently and are kept apart.
 - **No Kubernetes before there are five deployables.**
-- **No optimisation of the pipeline below ~30 s.** It is 0.005–9% of what the trader
-  experiences; the return is zero.
+- **No optimisation of the pipeline's MEDIAN below ~30 s.** Scoped per §7: at the median it is
+  0.005–9% of what the trader experiences, but at our own published p95 it is 55% of the wire
+  path. Controlling the tail is worth engineering; shaving the median is not.
 
 Each becomes wrong at some scale, so each carries a trigger rather than a prohibition:
 

@@ -1,0 +1,39 @@
+MIT License
+
+Copyright (c) 2026 rppol
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+DATA ATTRIBUTION
+
+Document metadata, titles, quotations and source URLs in fixtures/ and web/data/
+are derived from the GDELT Project (https://www.gdeltproject.org/), used under
+its terms, which require attribution. GDELT is not affiliated with this project
+and does not endorse it.
+
+Coffee "C" certified warehouse stock figures are derived from public reports
+published by ICE Futures U.S. (https://www.ice.com/). Positioning data, where
+used, is from the U.S. Commodity Futures Trading Commission. Price series are
+retrieved from public endpoints for research illustration only and are not
+official exchange settlements.
+
+This repository is a research prototype. Nothing in it is investment advice, and
+no signal it produces has demonstrated predictive value -- see docs/CASE_STUDY.md.

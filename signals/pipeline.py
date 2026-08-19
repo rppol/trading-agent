@@ -476,8 +476,15 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
         claims.append({
             # extractor version is part of the identity: a re-extraction is a new
             # claim, not an overwrite of the old one.
-            "claim_id": uuid.uuid5(uuid.NAMESPACE_URL,
-                                   d["url"] + quote[:40] + EXTRACTOR).hex[:16],
+            # The id must distinguish two claims that share a document and a quote
+            # but differ in driver or magnitude -- the fixtures already contained
+            # such a pair, and INSERT OR IGNORE discarded one with no error while
+            # the caller still counted it. Silent loss, introduced by the fix for
+            # silent overwrite.
+            "claim_id": uuid.uuid5(uuid.NAMESPACE_URL, "|".join([
+                d["url"], quote[:60], EXTRACTOR, str(c.get("signal")),
+                str(c.get("driver")), str(c.get("region")),
+                f"{float(c.get('magnitude') or 0):.4f}"])).hex[:16],
             "doc_id": d["doc_id"], "signal": c["signal"],
             # Computed from the stated physical effect, never taken from the model.
             "direction": BALANCE_SIGN.get(eff, 0),
