@@ -89,18 +89,17 @@ function viewOverview() {
     </div>
 
     <h2>The finding that reframes the brief</h2>
-    <p>The assignment says to ingest news from GDELT. We did, then measured what arrived —
-    <b>675,840 documents across 8,383 domains in seven days</b>. Reuters: <b>zero</b>. Cecafé,
-    Conab, the International Coffee Organization, and every coffee trade publication: <b>zero</b>.
-    Meanwhile a radio syndication network supplies <b>7.8%</b> of the corpus and boredpanda.com
-    is a top-ten source.</p>
-    <p>So the <b>4.7</b> tradeable coffee documents a day this pipeline surfaces are not thin signal —
-    <b>they are the false-positive floor</b>. This is an acquisition problem wearing the costume
-    of an NLP problem, and no amount of extraction quality recovers information that was never
-    ingested. The honest architecture demotes GDELT to what it is genuinely good at — an
-    origin-country unrest tripwire — and rebuilds acquisition around ICE certified stocks, CFTC
-    positioning and weather model runs, nearly all of which are free and most of which
-    <i>precede</i> the news rather than follow it.</p>
+    <p>The assignment says to ingest news from GDELT. We did, then measured what arrived.
+    <b>Reuters, AP, Bloomberg, Cecafé, Conab and the ICO are at zero as identified sources</b>
+    across 675,840 documents. But an earlier version of this page concluded from that that the
+    signal was absent, and <b>that inference was wrong</b> — GDELT's own organizations field
+    names Reuters in 1.66% of records and AP in 2.19%. The wire content is there; it arrives as
+    syndicated republication, second-hand and stripped of attribution.</p>
+    <p>Two further errors made the original claim look stronger than it was: substring matching
+    manufactured two of its data points, and <b>two thirds of the corpus was never measured</b> —
+    the translingual stream, which turns out to contain exactly the Vietnamese and Brazilian
+    daily coffee price reporting the claim said was missing. The corrected finding is narrower
+    and more useful: no primary source, no attribution, and a lexicon in the wrong alphabet.</p>
 
     <h2>Five things this argues</h2>
 

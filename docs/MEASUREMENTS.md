@@ -37,6 +37,46 @@ dead numbers. A number with three homes has no home.
 | Daily Coffee News | 11 |
 | `iheart.com` (radio syndication) | **52,439 — 7.8% of the corpus** |
 
+## The translingual stream, measured after review found it was never fetched
+
+192 batches, ~2 days.
+
+| Quantity | English stream | Translingual stream |
+|---|---:|---:|
+| Documents per day | ~96,000 | **~217,000** |
+| Share of total corpus | **31%** | 69% |
+| Coffee term in title | 88.3/day | 12.5/day |
+| Survives the market filter | 4.7/day | 2.5/day |
+
+Top source languages in the translingual sample: Spanish 69,994 · Chinese 41,291 · German
+39,347 · Russian 28,059 · Italian 26,465 · Turkish 22,218 · Portuguese 19,554 · French 18,490.
+
+The coffee yield looks lower, and that is an artefact of our own instrument: the relevance
+lexicon is `coffee|arabica|robusta`, **English only**. The five survivors matched solely because
+"robusta" is a loanword. `café`, `cà phê`, `kaffee`, `кофе` and `咖啡` match nothing, so the
+true translingual yield is unmeasured and certainly higher.
+
+What the survivors were — the category an earlier draft declared absent from GDELT entirely:
+
+- `vov.vn` — "Giá cà phê hôm nay 18/8: Giá cà phê Robusta tăng" (today's coffee price, robusta rising)
+- `dantri.com.vn` — Vietnamese daily agricultural prices, coffee jumping
+- `investimentosenoticias.com.br` — Brazilian robusta market
+
+## Wire presence by field, not by domain
+
+The distinction that broke the original headline claim.
+
+| Wire | As a domain | Named in `V1Organizations` |
+|---|---:|---:|
+| Associated Press | **0** | 14,815 (**2.19%**) |
+| Reuters | **0** | 11,198 (**1.66%**) |
+| Bloomberg | **0** | 2,511 (0.37%) |
+| Dow Jones | 0 | 524 (0.08%) |
+
+The earlier table reported "Bloomberg 189" and "Daily Coffee News 11" from **substring** matching
+against the domain field: those 189 were all `bnnbloomberg.ca`, a Canadian licensee. Exact-domain
+equality puts Bloomberg at zero too.
+
 ## Corrections already applied to this table
 
 - **1,550 documents per batch** was published, taken from a *single* sampled batch written
@@ -45,3 +85,6 @@ dead numbers. A number with three homes has no home.
 - **"50 documents collapsed into 24 clusters — half the corpus was echo"** was published as the
   sole empirical support for novelty weighting. The shipped corpus is **33 into 29, 12% echo**.
   The claim overstated its own evidence fourfold.
+- **"GDELT does not contain coffee market news"** was published as the headline finding. Wire
+  content is present at 2–4% under republisher domains, and the stream containing origin-country
+  coffee price reporting was never fetched. The corrected claim is in ARCHITECTURE §0.

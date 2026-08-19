@@ -10,93 +10,105 @@ the measurement won and the contradiction is noted.
 
 ---
 
-## 0. The measurement that reframes the brief
+## 0. The measurement that reframes the brief — corrected under review
 
-The assignment says to ingest news from GDELT. We did, and then measured what arrived.
-**675,840 documents across 8,383 distinct domains over seven days**, from the raw 15-minute
-knowledge-graph batches:
+An earlier version of this section claimed that **GDELT does not contain coffee market news**,
+on the basis that Reuters, Cecafé, Conab, the ICO and every coffee trade publication returned
+**zero documents** across 675,840 records. The measurement was right. **The inference drawn from
+it was wrong, and three methodological errors made it look stronger than it was.**
 
-| Source that actually moves coffee | Documents in 7 days |
+### What was wrong
+
+**Domain absence is not content absence.** Checking GDELT's own organizations column on the same
+corpus:
+
+| Named in the `V1Organizations` field | Records | Share |
+|---|---:|---:|
+| Associated Press | 14,815 | **2.19%** |
+| Reuters | 11,198 | **1.66%** |
+| Bloomberg | 2,511 | 0.37% |
+| Dow Jones | 524 | 0.08% |
+
+Meanwhile `reuters.com`, `apnews.com` and `bloomberg.com` are each **exactly 0 as domains**. So
+wire content is present at roughly 2–4% of the corpus; it simply arrives as **syndicated
+republication under other mastheads**. "Reuters: 0" is true and "therefore no wire content" does
+not follow.
+
+**Substring matching over-returned.** The original table reported "Bloomberg 189". Every one of
+those was `bnnbloomberg.ca`, a Canadian licensee. Actual `bloomberg.com` is zero. "apnews 190"
+was `kelownacapnews.com`. Two of the table's four non-zero rows were artefacts of matching a
+substring against a domain.
+
+**Two thirds of the corpus was never measured.** GDELT publishes translingual records in a
+**separate file set**, and this project fetched only the English stream. Measured directly:
+
+| Stream | Documents/day |
 |---|---:|
-| **Reuters** | **0** |
-| **Cecafé** (Brazilian exporters council) | **0** |
-| **Conab** (Brazilian crop agency) | **0** |
-| **ICO** (International Coffee Organization) | **0** |
-| Comunicaffe, Perfect Daily Grind, World Coffee Portal | 0 |
-| Barchart, StoneX, Platts, Hedgepoint, Volcafe, Sucafina | 0 |
-| Notícias Agrícolas, Globo Rural, Valor | 0 |
-| Bloomberg | 189 |
-| Argus Media | 39 |
-| Fastmarkets | 15 |
-| Daily Coffee News | 11 |
+| English (what was measured) | ~96,000 |
+| **Translingual (not measured)** | **~217,000** |
 
-And what *is* there:
+The published finding covered **31% of the corpus** — in a document that argues at length that
+Brazilian, Vietnamese and Colombian outlets break these stories first.
 
-| Top domains in the same corpus | Share |
-|---|---:|
-| `iheart.com` — a radio syndication network | **7.8%** (52,439 docs) |
-| `indiatimes.com` | 1.4% |
-| `yahoo.com` | 1.2% |
-| `boredpanda.com` | 0.5% |
+### What the missing two thirds actually contains
 
-**So the ~5 "tradeable" coffee documents a day this pipeline surfaces are not thin signal.
-They are the false-positive floor.** The wires, the trade press and the primary institutions
-that actually move the Coffee C contract are not in the corpus at all.
+Measuring 192 translingual batches (434,751 documents, ~2 days) with the same filter returns 25
+coffee titles and 5 survivors. The survivors are the point:
 
-**This is an acquisition problem wearing the costume of an NLP problem.** No improvement to
-filtering, extraction, prompting or model choice can recover information that was never
-ingested. A team that spends six months on extraction quality here will get better and better
-at reading documents that do not contain the answer.
+- `vov.vn` — *"Giá cà phê hôm nay 18/8: Giá cà phê Robusta tăng"* — today's coffee price,
+  robusta rising
+- `dantri.com.vn` — Vietnamese daily agricultural prices, coffee jumping
+- `investimentosenoticias.com.br` — Brazilian robusta market, premium quality investment
 
-GDELT is a general-purpose global crawler weighted toward local affiliates and syndication
-networks. It is genuinely good at what it was built for — civil unrest, protest, conflict — and
-that has real value for coffee as an **origin-country tripwire**: Colombian roadblocks,
-Ethiopian conflict, Vietnamese policy protest. It is not a market data source, and the honest
-architecture demotes it to the tripwire role.
+**That is daily origin-country coffee price reporting** — exactly the category the earlier draft
+declared absent, sitting in the stream it never fetched.
 
-### What the acquisition layer should be instead
+And a compounding defect: the relevance lexicon is `coffee|arabica|robusta`, **English only**,
+applied to a corpus that is 69% non-English (Spanish 70k, Chinese 41k, German 39k, Portuguese
+20k records in the sample). Those five survived *by accident*, because "robusta" is a loanword
+that appears in Vietnamese and Portuguese headlines. **`café`, `cà phê`, `kaffee`, `кофе` and
+`咖啡` match nothing.** The corpus was under-sampled and then filtered with the wrong alphabet.
 
-Almost all of it is free, and most of it *precedes* the news rather than following it.
+### The claim that survives, stated precisely
 
-| Source | Cadence | Access | Cost |
-|---|---|---|---|
-| **ICE certified arabica stocks** | Daily | Deterministic public URL, no auth — `coffee_cert_stock_YYYYMMDD.xls` | **Free** |
-| **CFTC Commitments of Traders** | Weekly, Fri 15:30 ET | Socrata JSON API, no token | **Free** |
-| **ECMWF open data** | 4 runs/day | `ecmwf-opendata`, CC-BY-4.0 since Oct 2025 | **Free** |
-| **NOAA GFS** | 4 runs/day | S3, no account needed | **Free** |
-| **Cecafé / Conab / USDA FAS / ICO** | Scheduled | Web, PDF, some APIs | **Free** |
-| Dow Jones CommodityWire | Real-time | API | ~$165/mo |
-| StoneX Coffee Essential (Brazil frost/rainfall) | Daily, pre-market | Portal | ~$51–60/mo |
+> **Wire services and primary institutions are absent from GDELT as identified sources.**
+> `reuters.com`, `apnews.com`, `bloomberg.com`, Cecafé, Conab and the ICO are at hard zero.
+> Their content reaches the corpus only as **syndicated republication — second-hand, delayed by
+> the syndication hop, and stripped of the attribution that would let you weight it.**
 
-**The fastest genuinely actionable coffee information is not a news feed at all.** It is a
-weather model run — free, four times a day, hours before any journalist writes anything — and,
-at the extreme, a Brazilian producer photographing frost on their own farm at dawn. The wire
-services sit between those two and cost tens of thousands a year. The trade press sits behind
-the wires. GDELT sits behind the trade press and does not index it.
+That is materially weaker than "the signal is not there" and materially more useful, because it
+names three separate problems with three different fixes: **no primary source** (add the free
+ICE, CFTC and Cecafé feeds), **no attribution** (resolve publisher from the organizations field
+rather than the domain), and **wrong alphabet** (a per-commodity multilingual lexicon, which the
+breadth mandate in §1a already requires).
 
-### The second measurement: our own clock was wrong
+### The counter-evidence worth stating against ourselves
 
-GDELT's filename is a **forward-dated window label, not a data-as-of mark.** Measured across
-consecutive batches:
+Where GDELT *has* been used successfully on commodities — corn futures, WTI crude, TTF gas, EU
+carbon allowances — the feature that worked was **raw article volume**, not tone and not
+classification. This pipeline discards volume as noise and extracts meaning instead. That may be
+the wrong bet, it is cheap to test, and the test belongs in the kill battery in §10.
+
+**And the process failure is worth more than the finding.** The original claim was measured
+carefully and reasoned about carelessly: a correct number, an unchecked inference, an
+English-only instrument, and a substring match that manufactured two of its own data points. It
+survived because it was *striking* and because nobody had checked the organizations column —
+which is one `grep` away and was in the data the whole time.
+
+### The second measurement, which stands
+
+GDELT's filename is a **forward-dated window label, not a data-as-of mark**:
 
 | Filename label | Actually written | Delta |
 |---|---|---|
 | `20260818183000` | 18:20:11 | **−9.8 min** |
 | `20260818181500` | 18:05:03 | −9.9 min |
 | `20260818180000` | 17:50:31 | −9.5 min |
-| `20260818174500` | 17:35:13 | −9.8 min |
 
-Two consequences, and this pipeline had both bugs until it was measured:
-
-1. **`ingest_time` must come from the HTTP `Last-Modified`, not the filename**, or every
-   document is forward-dated by ten minutes. In a backtest that error is *conservative* — it
-   hides information you genuinely had — but it is still a wrong column, and it silently
-   corrupts any latency metric computed from it later.
-2. **Polling `lastupdate.txt` beats firing on the quarter hour by those same ten minutes**, for
-   free. That is a larger latency win than anything in the compute path (§7), and it is a cron
-   change.
-
-Both are now fixed in `signals/pipeline.py`.
+So `ingest_time` must come from the HTTP `Last-Modified`, not the filename, or every document is
+forward-dated by ten minutes and any latency metric computed later is wrong. And polling
+`lastupdate.txt` beats firing on the quarter hour by those same ten minutes, free — a larger
+latency win than anything in the compute path (§7). Both are fixed in `signals/pipeline.py`.
 
 ---
 
