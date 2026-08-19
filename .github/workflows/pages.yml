@@ -53,6 +53,15 @@ jobs:
           mkdir -p _site
           cp -r web/* _site/
           mkdir -p _site/docs && cp docs/*.md _site/docs/
+          # Stamp the commit sha onto the asset URLs. index.html referenced
+          # app.js and styles.css unversioned, so a returning visitor kept the
+          # cached copies indefinitely -- and since the fetch policy lives INSIDE
+          # app.js, a stale app.js also meant stale documents, with no way to
+          # self-heal. Versioning the assets is what makes any later fix land.
+          V="${GITHUB_SHA::8}"
+          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$V\"|; s|src=\"app.js\"|src=\"app.js?v=$V\"|" _site/index.html
+          grep -o 'styles.css?v=[a-f0-9]*' _site/index.html
+          grep -o 'app.js?v=[a-f0-9]*' _site/index.html
 
       - uses: actions/upload-pages-artifact@v3
         with: { path: _site }
