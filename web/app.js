@@ -95,35 +95,33 @@ function viewOverview() {
       <div class="stat"><b>${c.documents ?? "—"}</b><span>documents ingested</span></div>
       <div class="stat"><b>${c.clusters ?? "—"}</b><span>after dedup</span></div>
       <div class="stat"><b>${c.claims ?? "—"}</b><span>cited claims</span></div>
-      <div class="stat"><b>0.4%</b><span>of cost is the LLM</span></div>
+      <div class="stat"><b>0.2%</b><span>of cost is the LLM</span></div>
     </div>
 
-    <h2>The finding that reframes the brief</h2>
+    <h2>What the corpus actually contains</h2>
     <p>The assignment says to ingest news from GDELT. We did, then measured what arrived.
     <b>Reuters, AP, Bloomberg, Cecafé, Conab and the ICO are at zero as identified sources</b>
-    across 675,840 documents. But an earlier version of this page concluded from that that the
-    signal was absent, and <b>that inference was wrong</b> — GDELT's own organizations field
-    names Reuters in 1.66% of records and AP in 2.19%. The wire content is there; it arrives as
-    syndicated republication, second-hand and stripped of attribution.</p>
-    <p>Two further errors made the original claim look stronger than it was: substring matching
-    manufactured two of its data points, and <b>two thirds of the corpus was never measured</b> —
-    the translingual stream, which turns out to contain exactly the Vietnamese and Brazilian
-    daily coffee price reporting the claim said was missing. The corrected finding is narrower
-    and more useful: no primary source, no attribution, and a lexicon in the wrong alphabet.</p>
+    across 675,840 documents — but the wire content is present. GDELT's organizations field
+    names Reuters in <b>1.66%</b> of records and AP in <b>2.19%</b>; it arrives as syndicated
+    republication, second-hand and stripped of the attribution you would weight it by.</p>
+    <p>And <b>two thirds of the corpus is a separate stream</b> — the translingual feed, which
+    carries exactly the Vietnamese and Brazilian daily price reporting an English-only view
+    misses. The finding is narrower than "the signal is absent" and more useful: no primary
+    source, no attribution, and a lexicon in the wrong alphabet.</p>
 
     <h2>Five things this argues</h2>
 
     <h3>Breadth, not depth, decides whether this works at all</h3>
     <p>Back out the information coefficient from the best published commodity-news result and you
-    get <b>0.013</b>. Applied to one commodity that is a gross Sharpe around <b>0.1–0.3</b>, which
-    is negative after realistic futures costs. More documents about coffee raise the precision of
-    one forecast; they do not add bets. <b>Adding the twenty-first commodity is worth more than
-    tripling coffee coverage</b> — so the marginal cost of commodity N+1 must be near zero, and
-    nothing may be hardcoded to coffee.</p>
+    get <b>0.030</b>. More documents about coffee raise the precision of one forecast; they do not
+    add bets. But breadth has a hard ceiling — under correlated bets the achievable information
+    ratio asymptotes at <b>0.486</b>, so <b>you cannot buy IR 0.5 by adding commodities</b>.
+    Breadth is still the largest lever available, which is why nothing may be hardcoded to
+    coffee — tested against wheat, the scaffolding transfers and the pipeline does not.</p>
 
     <h3>The volumes in the brief are a misdirection</h3>
     <p>Ten million AIS pings a day is <b>116 messages a second</b> — one database, not a
-    streaming cluster. Five hundred documents a day is about <b>nine dollars</b> of tokens.
+    streaming cluster. Five hundred documents a day is a rounding error in tokens.
     Only the imagery is genuinely large, and its cost is the licence, not the compute.
     Sizing this correctly is the first design decision, and most of the engineering
     budget belongs somewhere other than where the brief points.</p>
@@ -147,13 +145,12 @@ function viewOverview() {
     planted news.</p>
 
     <h3>The document argues against itself where the evidence does</h3>
-    <p>Three design decisions here are contradicted by the literature and are recorded as such
-    rather than quietly dropped: novelty weighting is probably <i>backwards</i>, the futures basis
-    probably subsumes the supply-risk signal, and the policy signal has too few events in a decade
-    to ever be validated. One earlier claim — that pretraining contamination accounts for most of
-    a news backtest's apparent alpha — <b>was simply wrong, and is retracted with the source
-    quoted</b>. The mechanism that produced that error is the first entry in the failure-mode
-    register.</p>
+    <p>Design decisions contradicted by the literature are recorded rather than quietly dropped:
+    novelty weighting is probably <i>backwards</i>, the futures basis probably subsumes the
+    supply-risk signal, and the policy signal has too few events in a decade to validate. The
+    falsification battery <b>currently fails its own gate</b> — 4.2 effective documents a day
+    against a threshold of 5 — and says so. <a href="#/evidence">Most of what this project
+    believed did not survive measurement</a>, and that record is the part worth reading.</p>
 
     <h2>What is actually running</h2>
     <p>The prototype ingests GDELT's bulk 15-minute knowledge-graph batches, collapses
