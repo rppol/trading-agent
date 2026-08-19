@@ -8,6 +8,33 @@ Each entry: **mechanism → detection → mitigation.**
 
 ---
 
+## 0. The five the brief names, with detection that actually fires
+
+The brief names cost blowup, model drift, label leakage, adversarial news and GPU starvation.
+Each is real here; each has a detector that fires *before* the damage, not after. The detail
+sits in the numbered sections below — this is the operational summary.
+
+**The organising principle: every one of these fails silently by default.** None throws an
+exception. Cost blowup looks like a busy day, drift looks like a quiet market, leakage looks like
+a good backtest, adversarial news looks like a scoop, and starvation looks like latency. So each
+detector is chosen to fire on *the absence or shape of something*, never on an error.
+
+| Mode | How it actually manifests here | Detection that fires early | Mitigation |
+|---|---|---|---|
+| **Cost blowup** | Not a bug — a **volume spike that arrives exactly when the system is most valuable.** News volume correlates with volatility. Also: an agentic loop accumulating O(N²) context, where a $0.05 task becomes $5.00 with no error thrown | **$/claim, not $/day** — a daily budget alarm fires after the money is gone. Per-claim cost, cache-hit rate, cascade survival rate, and a hard per-run step and token budget on every agentic graph | **Governor with graceful degradation, never a kill switch.** Degrade along the continuous-ablation order (STACK.md §5) — drop lowest marginal-value-per-dollar components first. Going dark during a volatility spike is the worst possible failure |
+| **Model drift** | Three different things wearing one name: **input drift** (publisher mix, language mix, doc length shift), **model drift** (the vendor silently updates a checkpoint), **concept drift** (the market's reaction function changes — identical news, different regime) | Input: distributional monitors on publisher/language/length. Model: **pin versions and re-run the golden set on a schedule** — a vendor swap is invisible otherwise. Concept: **IC decay tracked per regime**, plus the frozen-holdout gap from LEARNING.md §7 | Pin every model and prompt version in feature lineage. Champion/challenger with shadow traffic. Regime-conditioned scoring, so a regime change re-weights rather than silently invalidates |
+| **Label leakage** | The most dangerous because it produces **better** numbers. Four routes here: syndicated duplicates split across train and test; overlapping label windows at the boundary; **GDELT revising its own archive** so a rebuilt dataset contains documents that did not exist at their claimed timestamps; and using current-vintage macro data instead of the vintage that was live | **The one-switch leakage test, shipped in CI** — a single flag flips the pipeline between decision-time-correct and leaky, and the IC gap is asserted. Leakage becomes a measured number, not a warning in prose | Dedup **before** splitting. Time-sliced splits with an embargo equal to the longest label horizon. Snapshot GDELT at ingest. ALFRED vintages, never current FRED. Purged K-fold |
+| **Adversarial news** | Two distinct attacks: **market manipulation** (plant a plausible story to move a signal) and **prompt injection** (hide instructions in a document the extractor reads). The second is worse because it turns the pipeline into the attacker's tool | Injection: heuristics on hidden text, instruction-like spans, and encoding tricks — flagged per document. Manipulation: **novelty plus time-to-second-source.** A claim that stays single-sourced past a threshold is either an exclusive or a fabrication, and the discriminator is publisher history plus physical corroboration | **Break the lethal trifecta**: the extractor is a quarantined reader with **zero tools**. Structured-output-only. Numeric claims gated on a verbatim span. High-conviction signals require corroboration from a **physical** modality — an attacker can write an article; they cannot move 200,000 tonnes |
+| **GPU starvation / capacity** | Hosted: rate limits hit during exactly the volume spike above. Self-hosted: burst exceeds capacity and the queue grows without bound. Either way it presents as **latency, then as missing claims** — which looks identical to a quiet news day | Queue depth and age, not just latency. **Claims-per-hour floor with an alert on absence.** Provider error-rate and 429 rate as first-class metrics. Staleness minutes on every served signal | Batch tier for anything tolerant of it; the fresh path stays thin. Multi-provider fallback with a cheaper model as the degraded tier. Backpressure that sheds the lowest-value work rather than the newest. **The served payload always carries its own staleness** so a consumer can tell a quiet market from a stalled pipeline |
+
+**The cross-cutting detector is `alert on absence`.** Every mode above can present as "no signal
+today." So the monitors that matter most are the ones that fire on nothing happening: documents
+per batch below a floor, zero claims for N hours, a publisher gone silent, a scheduled release
+that did not arrive, and — counter-intuitively — **the gate rejection rate falling to zero**,
+which almost always means the gate broke rather than the model became perfect.
+
+---
+
 ## 1. Trusting a model's summary of the evidence — twice, including here
 
 **This entry has now been triggered by its own author on two separate occasions, and the
