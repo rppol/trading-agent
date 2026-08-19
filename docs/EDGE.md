@@ -142,11 +142,110 @@ that had to be retracted. The candidate scoring is under evaluation and lands in
 
 ---
 
-## 6. Candidate scoring
+## 6. Candidate scoring — six commodities, and all six are weak
 
-*In progress — five research tracks running against the criteria above. This section will carry
-the scored candidates and the chosen product, or an honest verdict that none of them clears the
-bar.*
+Scored against the criteria in §5. The honest headline is that **not one clears the bar**, and
+the least-bad wins on fewest disqualifying flaws rather than on merit.
+
+| Candidate | Verdict | What kills it |
+|---|---|---|
+| **Cocoa** (Ghana COCOBOD, CIV arrivals) | weak | **Reuters is the primary source** for half the CIV series — it phones brokers for the exporters'-estimate leg. A paid aggregator already sells it. And what actually mattered in 2023-24 was smuggling (~160k t) and disease, invisible in arrivals until after the fact |
+| **LME base metals** | weak | Dense numeric tables — **nothing for an LLM to read**. Same-day distribution to every desk via 50+ licensees. The 2022 nickel squeeze turned on Tsingshan's **bilateral OTC short, categorically absent from any public report**: no reader of public data, however fast, would have seen it |
+| **EU carbon (EUA)** | weak-moderate | The strongest regulatory-text case, and it still fails. The two price-moving events — the trilogue deal and the annual TNAC/MSR number — are **simultaneous scheduled broadcasts** at a fixed hour. Edge there is milliseconds, not comprehension. The genuinely dense documents move sector compliance costs, and CBAM's price is *pegged to* EUA rather than driving it |
+| **Dry bulk freight / FFAs** | weak | Fails on access alone. BDI panellist data is a paid product; fixtures reach the public through broker circulars **after the brokers have looked**; FFAs are OTC and voice-brokered. Disqualifying regardless of data quality |
+| **US gas pipeline EBBs** | weak | **The premise is false.** FERC Order 587 mandates the postings, but Genscape (now Wood Mackenzie) already sells "NatGas RT" aggregating **130+ pipelines and 20,000+ points** with alerting, and a freemium competitor exists. Not unparsed — parsed by an incumbent with a 25-year head start |
+| **Refinery outages** (TCEQ/BAAQMD) | weak | **Timing inverts the thesis.** The initial notice has a 24-hour legal window; the information-rich final report lands ~two weeks later, long after crack spreads moved. The explosion itself is the signal — the filing *confirms* the news. IIR Energy already runs phone-verified tracking across 8,500 facilities |
+
+### And the aggregation thesis was partially falsified — by its own best example
+
+§2's position 2 claimed the durable edge is aggregating facts too small to report, because that is
+not a race. **The mechanism is real; the "it stays unreported" clause is wrong.**
+
+Genscape's Cushing crude number is exactly this thesis executed: infrared readings of individual
+tanks plus pump-station sensors, aggregated into one weekly figure released a day ahead of the
+official EIA number. No single tank reading is news; the aggregate is. And it became a **branded
+product that Reuters has quoted by name in headline wire copy since at least 2015** — verifiable
+in dated stories from Mar 2015, Feb 2016 and May 2016, each attributing the price move to
+"Genscape." Verisk bought the company for **$364M in 2019**.
+
+**When aggregation works, it gets named.** The moat was proprietary sensor access and 25 years of
+continuous operation — a cost-structure moat, not an information-secrecy one. No documented case
+was found of a persistently nameless aggregate quietly moving markets. "A fund with real edge
+wouldn't publish it" is an unfalsifiable excuse, and should be labelled as one rather than used
+to rescue the claim.
+
+The part that survives scrutiny is narrower and still worth having: **extraction from
+unstructured, multi-language, multi-publisher text with no stable schema, plus entity resolution
+linking those mentions to canonical physical assets.** Both are documented as genuinely hard —
+WRI's own power-plant matcher admits it "can sometimes wrongly match two power plants or fail to
+match two entries for the same power plant," and S&P sells Kensho Link as a standalone product
+whose only job is matching messy text to 70M canonical IDs. Neither reduces to a `GROUP BY`.
+
+### What the literature says, which decides the whole question
+
+- **News sentiment is dead as a standalone signal.** Priced in milliseconds to seconds by HFT
+  infrastructure. Tetlock's own foundational paper found the effect **reverses within days** —
+  a noise-trader proxy, not information. McLean & Pontiff's base rate for any published predictor
+  is **26% lower out-of-sample, 58% lower after publication**.
+- **The interpretation gap is alive, and it is the best-evidenced text edge available.**
+  Jiang, Li & Wang (*JFE* 2021) find prices drift *in the same direction* for days after firm
+  news with no reversal, worse when investors are distracted and analysts slow — and state the
+  strategy **remains profitable after transaction costs**. Hirshleifer/Teoh and "Driven to
+  Distraction" supply the mechanism: attention is scarce and allocatable.
+- **Realistic effect size is IC 0.02–0.05**, giving IR ≈ 0.7 at 200 independent bets. Anything
+  claiming Sharpe > 2 from public text is a red flag — and note that the two most-cited academic
+  text results (Sharpe **4.29**; **22%/year**) are gross, uncapacitated backtests. Useful as
+  mechanism proof, not as return targets.
+
+### The alternative that is not a commodity at all
+
+Four independent research tracks converged on the same conclusion by different routes: the
+literature says target complex, low-attention material; REMIT says the edge is understanding a
+disclosure better than a schema does, not reading it first; aggregation says the moat is
+extraction plus entity resolution; the language track says the gap survives only in structured
+administrative data nobody narrates. **None of them says "pick commodity X."**
+
+So the selection axis is the **document class**, not the commodity: *where is the material
+hardest to process, and where is attention thinnest?*
+
+Which points at the single strongest idea available, and one nobody appears to have applied to
+commodities:
+
+> **Structural diff of recurring commodity documents.** Not the level, the *change in language
+> between successive editions of the same publication.*
+
+This is the "Lazy Prices" mechanism (Cohen, Malloy & Nguyen, *JoF* 2020): firms that materially
+change 10-K/10-Q language show **zero announcement-day price reaction** and up to **188bp/month**
+subsequent drift. The 22%/year headline is a gross academic long-short and should not be treated
+as a return target — but the *mechanism* is the cleanest identification in the whole literature
+of "the market had the information and did not read it." Zero same-day reaction is not
+underreaction to news; it is nobody looking.
+
+Commodities are full of recurring documents that nobody diffs: WASDE and CONAB narrative text
+edition over edition, exchange rulebooks and contract specs, TSO asset descriptions, producer
+annual reports, port authority tariff schedules, phytosanitary and quarantine notices. **This
+project already found one instance of exactly this by accident** — the ICE rule change, where the
+fact was reported the next day and correctly framed 28 days later. That is a document-diff signal
+that was caught by hand.
+
+It fits every constraint the evidence imposes. It is not a speed race — the drift accrues over
+weeks. It requires language understanding rather than a schema, because the signal *is* the
+change in wording. It targets the low-attention end. And it has a validation path that does not
+touch price: did the changed clause subsequently matter?
+
+### Ranking
+
+| Rank | Alternative | Case for | Case against |
+|---|---|---|---|
+| **1** | **Document-diff across recurring commodity publications** | Best-evidenced mechanism in the literature; zero same-day reaction; no speed race; needs exactly what an LLM does; never publicly applied to commodities | Novel extension, not a cited commodity finding. Effect size unproven outside equities |
+| **2** | **European gas/power (TTF, German baseload) via REMIT free-text + asset history** | Only candidate where mandatory disclosure is unambiguous law with a "without delay" rule; 200+ participants across 19+ countries, **1,000+ UMMs/day**; free-text "Reason for Unavailability" and "Remarks" fields **confirmed on a live record**; TTF traded ~103M contracts in 2025; and ENTSO-E/AGSI+ publish the truth, so a **nowcast can be graded** | Structured layer is commoditized twice over — free scrapers on GitHub, plus Wood Mackenzie/Genscape, Montel, Enappsys, Volue selling it. You compete on interpretation against 25-year incumbents |
+| **3** | EU carbon regulatory text | Unambiguous mandate, liquid instrument | Price-moving events are simultaneous broadcasts; ICIS/Veyt/Vertis already sell same-day Brussels analysis |
+| — | Cocoa, LME, freight, US gas EBBs, refinery filings | — | Each fails on a specific disqualifying flaw above |
+
+**Honest summary: option 2 is the best *system* and option 1 is the best *idea*.** They compose —
+REMIT supplies a gradeable nowcast target and a genuine free-text seam; document-diff supplies
+the mechanism with the strongest evidence and no incumbent. Neither is a licence to expect more
+than IC 0.02–0.05, and any claim above that should be treated as a defect.
 
 ---
 
