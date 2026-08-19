@@ -402,6 +402,7 @@ const ROUTES = {
   "#/pipeline": { doc: "PIPELINE.md", surface: "paper" },
   "#/learning": { doc: "LEARNING.md", surface: "paper" },
   "#/stack": { doc: "STACK.md", surface: "paper" },
+  "#/scale": { doc: "SCALE.md", surface: "paper" },
 };
 
 async function render() {
