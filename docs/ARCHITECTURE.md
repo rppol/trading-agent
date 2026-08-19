@@ -217,6 +217,27 @@ max achievable IR  = 0.0301 x sqrt(260) = 0.486
 breadth is half what was published: going from 1 commodity to 20 multiplies IR by
 `sqrt(4.17/1.00)` = **2.0x**, not 4.5x.
 
+### The mandate, measured against the code
+
+Coffee-specific lines across the pipeline: **41 of 1,458, about 3%** — and almost all of it is
+*data*, not logic.
+
+| Layer | Coffee-specific? |
+|---|---|
+| Two clocks, store schema, point-in-time reads | shared |
+| Grounding gate, dedup, novelty, scoring arithmetic | shared |
+| Relevance lexicon, origin map, driver enum, prompt text | **data** — a config row |
+| Price symbol, positioning market filter | **data** |
+| **Exchange inventory parser** | **code — one per exchange** |
+
+The mandate holds for the **text** half almost completely. It breaks at the exchange layer:
+`ice_stocks.py` is a bespoke parser for one file format from one exchange. Coffee needs one;
+**wheat needs four** (CBOT soft red, KC hard red winter, Minneapolis spring, Euronext milling),
+and grain inventory lives in government reports rather than exchange warehouse files anyway.
+
+Honest restatement: **text extraction is nearly free per commodity; inventory ingestion is not,
+and it scales with exchanges and statistical agencies rather than with commodities.**
+
 So the engineering mandate stands — **the marginal cost of commodity N+1 must be near zero**,
 because 2x is still the largest single lever available and it is cheap. Nothing may be hardcoded
 to coffee; the lexicon, origin taxonomy, driver enumeration and prompt are data, not code. But
