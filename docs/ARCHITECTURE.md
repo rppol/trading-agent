@@ -217,32 +217,42 @@ max achievable IR  = 0.0301 x sqrt(260) = 0.486
 breadth is half what was published: going from 1 commodity to 20 multiplies IR by
 `sqrt(4.17/1.00)` = **2.0x**, not 4.5x.
 
-### The mandate, measured against the code
+### The mandate, tested against wheat — and it does not survive as written
 
-Coffee-specific lines across the pipeline: **41 of 1,458, about 3%** — and almost all of it is
-*data*, not logic.
+The first attempt at this test counted **coffee-specific lines in the existing code**: 41 of
+1,458, about 3%, almost all lexicon and enums. It concluded the pipeline was 97%
+commodity-agnostic.
 
-| Layer | Coffee-specific? |
+**That measurement was survivorship.** It counts how much coffee-specific code *exists*; the
+question is how much wheat-specific code is *missing*. A pipeline with no concept of a government
+as a market participant scores zero coffee-specific lines there — which reads as portable and
+means absent.
+
+Tested properly, against the brief's own second commodity ([WHEAT.md](WHEAT.md)):
+
+| Transfers as-is | Must be built for wheat |
 |---|---|
-| Two clocks, store schema, point-in-time reads | shared |
-| Grounding gate, dedup, novelty, scoring arithmetic | shared |
-| Relevance lexicon, origin map, driver enum, prompt text | **data** — a config row |
-| Price symbol, positioning market filter | **data** |
-| **Exchange inventory parser** | **code — one per exchange** |
+| Claim schema, two clocks | **Multi-venue resolver** — origin to venue across 5 exchanges is routing logic, not a lookup |
+| Grounding gate, dedup, novelty | **2D class-spread engine** — coffee's differential is origin-only; wheat is origin x protein class |
+| Point-in-time reads | **Government-action ingestion** — bans, state tenders, stockpiles, for at least 4 countries |
+| Scoring arithmetic | **Substitution watch** (a corn shock generates wheat claims) and a **two-hemisphere harvest calendar** |
 
-The mandate holds for the **text** half almost completely. It breaks at the exchange layer:
-`ice_stocks.py` is a bespoke parser for one file format from one exchange. Coffee needs one;
-**wheat needs four** (CBOT soft red, KC hard red winter, Minneapolis spring, Euronext milling),
-and grain inventory lives in government reports rather than exchange warehouse files anyway.
+**The mandate holds for the outer scaffolding and fails for the pipeline.** Claim schema, clocks,
+grounding gate and dedup genuinely transfer — the parts that took longest to get right and would
+most likely be rebuilt wrong. But three new subsystems, one cross-commodity dependency and a
+seasonal calendar stand between a wheat document and a graded wheat claim.
 
-Honest restatement: **text extraction is nearly free per commodity; inventory ingestion is not,
-and it scales with exchanges and statistical agencies rather than with commodities.**
+So the honest form of the engineering mandate is narrower than the earlier draft's: **nothing may
+be hardcoded to coffee, and the scaffolding must stay commodity-blind** — that discipline is real
+and it is what makes the 2x breadth lever reachable at all. But N+1 is not a config row, and
+saying so was an overclaim the brief's own second commodity falsifies.
 
-So the engineering mandate stands — **the marginal cost of commodity N+1 must be near zero**,
-because 2x is still the largest single lever available and it is cheap. Nothing may be hardcoded
-to coffee; the lexicon, origin taxonomy, driver enumeration and prompt are data, not code. But
-breadth alone will not produce a book, and the earlier draft's implication that it would was
-arithmetic that had not been carried to its limit.
+Wheat also **re-confirms the differential rule on independent evidence, and finds its exception.**
+A regional shock lives in spreads — Russia's weekly export duty has no mechanism to move CBOT SRW
+— except when the shocked origin is large enough relative to world trade: the Black Sea corridor
+carried ~33 Mt, and its collapse moved flat price +3.5% in a session. **The rule is gated by
+origin share of world trade, not by geography**, and it needs that threshold written into it or
+it will misroute the next large one.
 
 ### Which points at the conclusion the source paper actually reaches
 

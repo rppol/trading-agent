@@ -397,6 +397,7 @@ const ROUTES = {
   "#/orchestration": { doc: "ORCHESTRATION.md", surface: "paper" },
   "#/sources": { doc: "SOURCES.md", surface: "paper" },
   "#/measurements": { doc: "MEASUREMENTS.md", surface: "paper" },
+  "#/wheat": { doc: "WHEAT.md", surface: "paper" },
 };
 
 async function render() {
