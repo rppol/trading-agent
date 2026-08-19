@@ -335,7 +335,11 @@ function bindCost() {
 /* ------------------------------------------------------------------ docs */
 
 async function viewDoc(file) {
-  const md = await fetch(`docs/${file}`).then(r => r.ok ? r.text() : `# Not found\n\n\`${file}\``);
+  // no-cache revalidates against the server instead of trusting a stale copy.
+  // Without it a returning visitor kept an old doc indefinitely -- the live site
+  // served a 2-diagram ARCHITECTURE while the file on disk had 12.
+  const md = await fetch(`docs/${file}`, { cache: "no-cache" })
+    .then(r => r.ok ? r.text() : `# Not found\n\n\`${file}\``);
   const blocks = [];
   const src = md.replace(/```mermaid\n([\s\S]*?)```/g, (_, code) => {
     blocks.push(code); return `<div class="mermaid" data-i="${blocks.length - 1}"></div>`;
@@ -417,7 +421,7 @@ async function render() {
 async function boot() {
   try {
     const [claims, docs, meta] = await Promise.all(
-      ["claims", "docs", "meta"].map(f => fetch(`data/${f}.json`).then(r => r.json())));
+      ["claims", "docs", "meta"].map(f => fetch(`data/${f}.json`, { cache: "no-cache" }).then(r => r.json())));
     DATA = { claims, docs, meta };
   } catch {
     $("#view").innerHTML = `<p class="loading">Signal data not generated yet — run <code>make export</code>.</p>`;
