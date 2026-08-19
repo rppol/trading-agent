@@ -403,6 +403,7 @@ const ROUTES = {
   "#/learning": { doc: "LEARNING.md", surface: "paper" },
   "#/stack": { doc: "STACK.md", surface: "paper" },
   "#/scale": { doc: "SCALE.md", surface: "paper" },
+  "#/storage": { doc: "STORAGE.md", surface: "paper" },
 };
 
 async function render() {
