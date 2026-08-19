@@ -1,5 +1,7 @@
 # Cost
 
+All measured figures resolve to [MEASUREMENTS.md](MEASUREMENTS.md).
+
 Back-of-envelope for the system at the brief's stated scale. Assumptions are stated so they
 can be argued with; the [interactive model](../index.html#/cost) recomputes as you change them.
 
@@ -35,7 +37,7 @@ Footprint: 200 areas of interest at 4 km² each, 200k text items/day, 1 TB/day o
 
 | Line | $/month | Share |
 |---|---:|---:|
-| People — 5 engineers | 30,000 | 39.9% |
+| People — 5 engineers (see note) | 30,000 | 39.9% |
 | AIS licence — commercial S-AIS | 20,000 | 26.6% |
 | Exchange data + derived-data licences | 12,000 | 16.0% |
 | Satellite tasking — 30 triggered events | 6,000 | 8.0% |
@@ -47,6 +49,20 @@ Footprint: 200 areas of interest at 4 km² each, 200k text items/day, 1 TB/day o
 | **Total** | **75,208** | |
 
 **Data licences 51%. People 40%. All compute and inference together under 10%.**
+
+**The people line is the weakest number in this table and it inverts the headline.** $30,000 a
+month for five engineers is **$72,000 a year fully loaded each**, which holds only at offshore
+rates and is not stated as an assumption. At a realistic $250–400k fully loaded, the monthly
+total becomes ~$170,000 and the split flips to **people 73%, data licences 22%.** The finding
+that survives either way — and in fact strengthens — is that **the LLM is the cheapest line in
+the system**, falling from 0.4% to 0.17%. The licences-versus-people framing does not survive,
+and is corrected here rather than defended.
+
+**A second collision, between this table and §1a.** The breadth argument says viability needs
+20–40 commodities. The derived-data schedule below prices per instrument. At 24 commodities,
+CME derived-data licensing alone is roughly **$534,000/year — about 59% of this entire staged
+budget**, and the $75,208 figure understates by well over half. The two halves of this document
+were never priced together, and doing so is the single most useful correction available to it.
 
 ---
 
@@ -111,8 +127,9 @@ The cascade exists for three other reasons:
   and a provider outage as a single point of failure. Two dozen calls fails safe.
 
 **Which inverts the obvious recommendation: widen the model gate, do not narrow it.** Sending
-all ~163 coffee-mentioning documents to extraction rather than only the ~24 that pass the
-market filter costs about **$2,700/year**. That is recall insurance, and one missed frost story
+all **88** coffee-mentioning documents a day to extraction rather than only the **4.7** that
+pass the market filter costs roughly **$700/year** at metered prototype rates, and far less at
+production rates. That is recall insurance, and one missed frost story
 costs more than the premium. Spend what the cascade saved on more coverage, not less.
 
 **Tokens: prompt caching does not help us, and I initially assumed it would.** The extraction
@@ -137,12 +154,13 @@ Not an estimate — metered from the runs:
 | Item | Measured |
 |---|---|
 | GDELT ingest | $0 — bulk files are free and unthrottled |
-| Extraction, 15 documents, 2 batched calls | **$0.27** |
-| Implied per-document | ~$0.018 |
-| Projected at 25 tradeable docs/day | **~$0.45/day** |
-| Projected with a 10× wider commodity set | **~$4.50/day** |
+| Extraction, 33 documents, 5 batched calls | **$0.76** |
+| Implied per-document | ~$0.023 |
+| Projected at the measured 4.7 tradeable docs/day | **~$0.11/day** |
+| Projected across 20 commodities at the same rate | **~$2.20/day** |
 
-Roughly **$14/month** to run the text half of this system for one commodity. The AIS licence
+Roughly **$3/month** to run the text half of this system for one commodity at the measured
+volume — and note how small that makes every token-optimisation argument. The AIS licence
 costs more than that before lunch on the first day.
 
 A note on the metered figure: $0.021 per document is high for a batched extraction, because

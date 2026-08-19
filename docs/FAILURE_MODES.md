@@ -8,52 +8,58 @@ Each entry: **mechanism → detection → mitigation.**
 
 ---
 
-## 1. Trusting a model's summary of the evidence — including our own
+## 1. Trusting a model's summary of the evidence — twice, including here
 
-**This entry began as a different claim, and correcting it is the most instructive thing in
-this document.**
+**This entry has now been triggered by its own author on two separate occasions, and the
+second one is why the lesson changed.**
 
-An earlier draft asserted that research on chronologically consistent language models measured
-standard LLMs at 65–70% accuracy predicting price direction from historical text against 50–55%
-for era-matched models, and concluded that roughly the entire apparent alpha of a news backtest
-is pretraining contamination.
+**First instance.** An earlier draft asserted that standard LLMs score 65–70% predicting price
+direction from historical text against 50–55% for era-matched models, concluding that
+pretraining contamination accounts for roughly the whole apparent alpha of a news backtest.
+The figure came from a summarising model's reading of the paper. The abstract of He, Lv, Manela
+& Wu (2025), [arXiv:2502.21206](https://arxiv.org/abs/2502.21206), says the opposite, verbatim:
 
-**That figure was wrong.** It came from a summarising model's reading of the paper, not from the
-paper. The abstract of He, Lv, Manela & Wu (2025), [arXiv:2502.21206](https://arxiv.org/abs/2502.21206),
-says the opposite, verbatim:
+> "…ChronoBERT and ChronoGPT's real-time outputs achieve Sharpe ratios comparable to a much
+> larger Llama model, **indicating that lookahead bias is modest**."
 
-> "In an asset pricing application predicting next-day stock returns from financial news, we
-> find that ChronoBERT and ChronoGPT's real-time outputs achieve Sharpe ratios comparable to a
-> much larger Llama model, **indicating that lookahead bias is modest**."
+**Second instance — committed in the very section written to confess the first.** This document
+twice stated that Pontes et al., [arXiv:2507.03350](https://arxiv.org/abs/2507.03350), reports
+50.63% returns over 28 months and *"never mentions transaction costs or slippage."* Extracting
+the PDF's text stream and grepping it returns:
 
-The same paper stresses that lookahead bias is "model and application-specific."
+> "…important to note that **in our analysis we assume commission fees of 0.05% of the traded
+> value**"
 
-**Why this belongs in a failure-mode register rather than a quiet edit.** The mechanism that
-produced the error is exactly the one this system exists to defeat: an unverified paraphrase
-from a language model was promoted to a load-bearing conclusion and propagated into two
-documents. The verbatim-span gate in the pipeline exists because a model's summary is not
-evidence. That standard was applied to the pipeline's inputs and not to its authors.
+The paper models costs. The claim was false. The abstract omits costs; the methodology does not —
+which is exactly the shape of an assertion made from a summary.
 
-**The generalised failure.** Anywhere a model summarises a source and a human acts on the
-summary without opening the source, you have an unaudited claim. It is invisible because the
-summary is fluent, plausible, and directionally reasonable — this one was all three, and it
-supported a conclusion that felt sophisticated.
+**What settled it is the important part.** A fetch-and-summarise pass over that PDF reported "no
+mention of transaction costs found." A second reviewer reported the commission sentence. Two
+model readings of the same document contradicted each other, and **only a deterministic text
+extraction and a `grep` resolved it.** That is the argument for the verbatim-span gate,
+demonstrated on the author rather than on the pipeline.
 
-**Detection.** Every quantitative claim in a research artefact carries a citation, and a
-citation means a quotation that can be checked, not a link that gestures at a paper. Spot-check
-a random sample against primary sources. A claim whose number cannot be found in the cited
-document is treated exactly as the pipeline treats an ungrounded extraction: rejected.
+**Why two instances change the conclusion.** One is an error and the remedy is care. Two of the
+identical failure, the second inside the paragraph apologising for the first, is a **systemic
+defect**, and vigilance demonstrably does not fix it. The remedy has to be mechanical:
 
-**Mitigation, and what the real risk is.** Contamination is a **hypothesis to test, not a
-quantity to assume**. Glasserman & Lin ([arXiv:2309.17322](https://arxiv.org/abs/2309.17322))
-do document both a look-ahead bias and a *distraction* effect from named entities in model
-sentiment over 181,908 Reuters headlines, and find that anonymising company identifiers can
-improve performance. So the controls are cheap and worth adopting regardless of effect size:
+- **A citation is a quotation, not a link.** Any number attributed to a source carries a
+  verbatim string that a machine can check against the source text.
+- **Never assert a negative from an abstract.** "The paper does not address X" requires a
+  full-text search, because absence in a summary is not absence in a document.
+- **Prefer `grep` to a reader.** Where a claim is checkable mechanically, check it mechanically.
+  A model summarising a PDF is a lossy compressor, and the loss is silent.
 
-- **Mask entity names, dates and price levels** in the extraction prompt. If extraction quality
-  depends on the model recognising *which* drought this was, that dependence is measurable.
-- **Run the backtest twice** — once with the production model, once era-matched — and report the
-  gap as a measured quantity rather than asserting it.
+**The generalised failure.** Anywhere a model summarises and a human acts on the summary without
+opening the source, there is an unaudited claim. It is invisible because the summary is fluent,
+plausible, and usually directionally right — all three were true here, twice.
+
+**Mitigation for the actual risk this was about.** Contamination remains a **hypothesis to
+measure, not a quantity to assume**. Glasserman & Lin
+([arXiv:2309.17322](https://arxiv.org/abs/2309.17322)) do document a look-ahead bias and a
+distraction effect from named entities across 181,908 headlines, and find anonymisation helps.
+So: mask entity names, dates and price levels in extraction, run the backtest era-matched, and
+report the gap as a measured number.
 
 ---
 
@@ -100,7 +106,9 @@ the corpus was echo.
 **Detection.** Cluster-to-document ratio per window. A sudden move toward 1.0 means the
 deduplicator has stopped working; a move toward 0.1 means a syndication storm.
 
-**Mitigation.** Near-duplicate collapse before scoring; novelty as a first-class weight;
+**Mitigation.** Near-duplicate collapse before scoring; novelty as a first-class weight — **with the sign
+treated as an open question**, since the evidence in ARCHITECTURE §1b suggests it should be
+inverted;
 deduplicate **before** splitting folds, and split by story cluster rather than by row. Track
 **time-to-second-source** — a claim that stays single-sourced is either an exclusive or a
 fabrication, disambiguated by source reputation and physical corroboration.
@@ -276,8 +284,8 @@ Real, and each would hurt — but none is peculiar to this system.
 **A Sharpe ratio of 5.87.**
 
 That figure is reported in published work applying sentiment to GDELT — free, public data
-that anyone can download. Real macro strategies live between 0.5 and 1.5. Another paper
-reports 50.63% returns over 28 months and **never mentions transaction costs or slippage**.
+that anyone can download. Real macro strategies live between 0.5 and 1.5. It is a single-author
+unreviewed preprint, and a replication reports mean accuracy of 51.2% with an AUC of 0.500.
 
 If free public data produced a Sharpe near 6, it would be arbitraged within a quarter. So
 the number is not a result, it is a defect report — some combination of unmodelled costs, a

@@ -1,6 +1,6 @@
 """Serving. Two latency classes, deliberately separate.
 
-  cached  -- GET /v1/signals/coffee          target p99 < 50ms
+  cached  -- GET /v1/signals/coffee          target p99 < 250ms
   fresh   -- POST /v1/refresh -> job id      minutes, runs the LLM
 
 Mixing them is the classic mistake: one slow inference behind a synchronous
@@ -24,6 +24,9 @@ from .pipeline import score, run, SIGNALS
 app = FastAPI(title="trading-agent", version="0.1.0",
               description="Coffee signals extracted from GDELT GKG by an LLM.")
 
+# ponytail: unbounded dict. A caller sweeping as_of at second resolution would
+# grow it without limit; cap it with an LRU when the API is exposed to anyone
+# other than us.
 _cache: dict[str, tuple[float, dict]] = {}
 _stats = {"hits": 0, "misses": 0}
 _jobs: dict[str, dict] = {}
@@ -70,8 +73,12 @@ def _snapshot(as_of: str | None) -> dict:
             "latest_event": latest,
             # staleness is reported, never hidden. A caller acting on a signal
             # is entitled to know how old the newest evidence under it is.
+            # Measured against the replay instant, not wall clock. Reporting
+            # "9,108 minutes stale" for a historical replay is true of now and
+            # meaningless of the replay.
             "staleness_minutes": round(
-                (datetime.now(timezone.utc) - datetime.fromisoformat(latest)).total_seconds() / 60
+                ((datetime.fromisoformat(as_of) if as_of else datetime.now(timezone.utc))
+                 - datetime.fromisoformat(latest)).total_seconds() / 60
             ) if latest else None,
         },
     }
@@ -105,7 +112,6 @@ def history(commodity: str, days: int = 7, step_hours: int = 6):
     how most 'historical signal' charts quietly become lookahead."""
     conn = connect()
     rows = claims_as_of(conn, None)
-    nov = _novelty(conn)
     end = datetime.now(timezone.utc)
     out = []
     for i in range(int(days * 24 / step_hours), -1, -1):
@@ -113,7 +119,10 @@ def history(commodity: str, days: int = 7, step_hours: int = 6):
         visible = [r for r in rows if r["ingest_time"] <= t]
         if not visible:
             continue
-        out.append({"t": t, **{k: v["value"] for k, v in score(visible, t, nov).items()},
+        # Novelty must be recomputed as of t. Using today's novelty back-dated a
+        # weight that later documents determined -- a lookahead hiding inside a
+        # correct-looking filter.
+        out.append({"t": t, **{k: v["value"] for k, v in score(visible, t, _novelty(conn, t)).items()},
                     "claims": len(visible)})
     return {"commodity": commodity, "points": out}
 
@@ -145,9 +154,12 @@ def claims(signal: str | None = None, as_of: str | None = None, limit: int = 50)
 
 def _worker(job_id: str, backend: str, batches: int):
     try:
-        res = run(backend=backend, n_batches=batches)
+        res = run(backend=backend, batches=batches)
         _jobs[job_id].update(status="done", finished=now(), detail=res)
-        _cache.clear()
+        # Only the live key is mutable. A point-in-time read can never change --
+        # no future write alters the past -- so clearing historical entries threw
+        # away valid work and contradicted the design's own central claim.
+        _cache.pop("_live", None)
     except Exception as e:
         _jobs[job_id].update(status="failed", finished=now(), detail={"error": str(e)[:400]})
 

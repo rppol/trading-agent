@@ -132,69 +132,94 @@ that makes everything else mean something — see §6.
 
 ---
 
-## 1a. Breadth is the viability condition, and the arithmetic is worse than it looks
+## 1a. Breadth, corrected — and the correction runs against the earlier draft
 
-Everything else in this document is downstream of one calculation, and an earlier draft of it
-was too kind. Rather than assume an information coefficient, back it out of the best published
-result.
+This section has been wrong twice, in opposite directions, and the second correction changes
+the architectural conclusion. Both versions are shown because the reasoning matters more than
+the number.
 
-Vu, Chi & El-Jahel (2025, *Journal of Futures Markets* 45(10)) run news sentiment across **24
-commodities**, weekly, and report a post-cost Sharpe of **0.450** at t = 2.17. Through
-`IR = IC x sqrt(BR)`:
+**Draft 1** assumed an information coefficient of 0.03–0.05 and concluded coffee alone reached
+IR ≈ 0.37.
+
+**Draft 2** backed the IC out of the best published result instead of assuming it — Vu, Chi &
+El-Jahel (2025, *JFM* 45(10)), post-cost Sharpe **0.450** across 24 commodities weekly:
 
 ```
-BR  = 24 commodities x 52 weeks = 1,248 bets/year
-IC  = 0.450 / sqrt(1,248)       = 0.0127
+BR = 24 x 52 = 1,248      IC = 0.450 / sqrt(1,248) = 0.0127
 ```
 
-**So the implied per-bet IC of a real commodity news signal is 0.013–0.018** — below the bottom
-of the range usually called a credible factor. Apply it to one commodity:
+and concluded coffee was hopeless. **That is the version that was published, and it contains
+two errors that both bias it pessimistic.**
 
-| Configuration | Breadth | Gross IR |
-|---|---:|---:|
-| Coffee, weekly | 52 | **0.09 – 0.13** |
-| Coffee, daily | 252 | **0.20 – 0.29** |
-| Coffee, daily, transfer coefficient 0.6 | 252 | **0.12 – 0.17** |
+### Error one: `BR = N x T` assumes the bets are independent, and they are not
 
-Then subtract costs. A Coffee C contract is 37,500 lb, one tick is $18.75 — about 1.7 bps at
-300 c/lb — so an all-in round trip is roughly **5–9 bps**. Against ~30% annualised coffee
-volatility:
+Commodities co-move — a single ENSO phase drives coffee, cocoa, sugar and palm together;
+the dollar and freight touch everything. The standard correction is
 
-| Rebalance | Round trips/yr | Sharpe drag |
-|---|---:|---:|
-| Daily | 252 | **0.58** |
-| Weekly | 52 | 0.12 |
-| Monthly | 12 | 0.03 |
+```
+BR_eff = N / (1 + (N-1) rho) x T
+```
 
-**A daily-rebalanced coffee-only news strategy is negative net of costs by a factor of two to
-six. A weekly one is a rounding error above zero.** That is closed-form arithmetic available
-before any model is trained.
+| rho | N_eff | BR_eff/yr | implied IC |
+|---:|---:|---:|---:|
+| 0.0 (as published) | 24.0 | 1,248 | 0.0127 |
+| 0.1 | 7.3 | 378 | 0.0231 |
+| **0.2** | **4.3** | **223** | **0.0301** |
+| 0.3 | 3.0 | 158 | 0.0358 |
 
-**Breadth counts decisions, not documents.** This is the part most easily got wrong. Trading one
-contract on a daily signal gives 252 bets a year whether 20 documents arrive daily or 20,000.
-More documents on the *same* commodity raise the precision of one forecast — they move IC toward
-a ceiling — they do not add bets. And the gain is sub-linear: 20 documents a day that are really
-three wire originals recycled by five outlets contribute about `sqrt(3)`, not `sqrt(20)`.
+Attributing the same 0.450 Sharpe to **fewer** independent bets makes the per-bet IC **higher**.
+The published draft called its predecessor "too kind"; it had the sign backwards. The realistic
+implied IC is **0.023–0.036**, roughly 2.4x what was published.
 
-Inverting for a shippable IR of 0.5 at IC 0.0127 gives **~1,550 bets/year — roughly 30
-independent commodities at weekly rebalance.** Going from 1 commodity to 20 multiplies IR by
-`sqrt(20)` = **4.5x**. Tripling coffee document volume multiplies it by well under 1.2x.
+### Error two: transaction costs were subtracted twice
 
-> **Adding the twenty-first commodity is worth more than tripling coffee coverage, and it is
-> cheaper — the extraction schema is already commodity-generic.**
+The 0.450 Sharpe is **post-cost**. An IC derived from it is a **net** IC. The published table
+labelled the coffee column "Gross IR" and then subtracted a turnover drag on top — charging
+costs to the same signal twice.
 
-So commodity plurality is not a roadmap item. It is the condition under which the system is
-worth building, and it converts into one engineering requirement:
+### What the corrected arithmetic actually says
 
-> The marginal cost of commodity N+1 must be near zero.
+At IC ≈ 0.030 net, coffee alone on a daily signal gives `0.030 x sqrt(252)` ≈ **0.48** — not a
+great book, but **not the "negative by a factor of two to six" the earlier draft asserted.** The
+drag itself was also overstated: it assumed 252 full round trips a year, which presumes a signal
+with zero persistence flipping sign daily; realistic turnover of 30–50% puts the drag nearer
+0.15–0.30 than 0.58.
 
-Nothing may be hardcoded to coffee. The relevance lexicon, origin taxonomy, driver enumeration,
-entity graph and extraction prompt are **data, not code** — parameterised per commodity and
-versioned alongside it. Adding wheat should be a configuration row, not a pull request against
-the pipeline. Cheap now, expensive to retrofit; the same asymmetry as the two clocks in §3.
+### But the mandate survives, and a ceiling appears that nobody had computed
 
-The prototype here is deliberately coffee-only because the brief asked for one end-to-end slice.
-Where it hardcodes coffee, that is a shortcut with a stated ceiling, marked as such in the code.
+Under correlated breadth, adding commodities has an **asymptote**:
+
+```
+as N -> infinity,  BR_eff -> T/rho = 52/0.2 = 260 bets/yr
+max achievable IR  = 0.0301 x sqrt(260) = 0.486
+```
+
+**You cannot buy IR 0.5 by adding commodities at weekly rebalance. Ever.** And the gain from
+breadth is half what was published: going from 1 commodity to 20 multiplies IR by
+`sqrt(4.17/1.00)` = **2.0x**, not 4.5x.
+
+So the engineering mandate stands — **the marginal cost of commodity N+1 must be near zero**,
+because 2x is still the largest single lever available and it is cheap. Nothing may be hardcoded
+to coffee; the lexicon, origin taxonomy, driver enumeration and prompt are data, not code. But
+breadth alone will not produce a book, and the earlier draft's implication that it would was
+arithmetic that had not been carried to its limit.
+
+### Which points at the conclusion the source paper actually reaches
+
+The same study's headline is not that news sentiment is a standalone signal. It is that
+sentiment **combined** with price-based factors beats either alone — basis-momentum at Sharpe
+0.535 rises to **0.763** when double-sorted with sentiment. And a purely price-derived signal
+(skewness, Sharpe 0.714) beat the news signal outright on every metric.
+
+**So the defensible architecture is news as a conditioner on a price-based book, not as a
+directional signal in its own right.** That reframing costs nothing structurally — the claim
+ledger, the two clocks and the corroboration model are unchanged — and it is what the evidence
+supports rather than what the brief implies.
+
+**One caveat that no amount of arithmetic resolves:** an IC derived from a *cross-sectional*
+ranking of 24 commodities has no defined transfer to a *single-asset time-series* bet on coffee.
+Every coffee-only number above inherits that assumption. It is stated here rather than buried,
+because it is the weakest joint in the chain.
 
 ---
 
@@ -349,8 +374,9 @@ Measured, not assumed:
 
 - The DOC query API is **throttled to roughly one request per five seconds**, and answers
   violations with a **plain-text notice under HTTP 200**. Parsed naively that becomes
-  `articles: []` — indistinguishable from a quiet news day. This is a silent outage, and it
-  is why the ingest guard requires a payload to begin with `{`.
+  `articles: []` — indistinguishable from a quiet news day. This is a silent outage, and any client of that
+  API needs a guard requiring the payload to begin with `{`. The prototype sidesteps it
+  entirely by never calling the query API — it reads the bulk files.
 - Its query language accepts parentheses **only around OR-groups**. `coffee (sourcelang:english)`
   returns the error string `Parentheses may only be used around OR'd statements.` with a
   200 status. Another fail-open.
@@ -378,6 +404,9 @@ below are the full 673-batch corpus, not an extrapolation from one sample.
 | Removed by the retail blocklist | 153 | 21.8 |
 | **Survives the market filter** | **33** | **4.7** |
 
+All figures resolve to [MEASUREMENTS.md](MEASUREMENTS.md), which is the single source of truth
+for every measured number in these documents.
+
 **Under five tradeable coffee documents a day**, and the cheap filter removes **95%** of
 coffee-mentioning documents before any model runs.
 
@@ -388,7 +417,7 @@ batches is **mean 1,004, median 946, range 314–2,189**: a sevenfold spread, so
 single number was misleading regardless of which one. The corrected funnel is a fifth the size
 of the published one, which makes §1a's breadth problem worse rather than better.
 
-The 85% the cheap filter removes are real: coffee-shop openings, campus promotions, a
+The 95% the cheap filter removes are real: coffee-shop openings, campus promotions, a
 retirement-town listicle, and — before the filter was tightened — a stag shot in a park,
 which matched because `ban` has no word boundary and so does `urban`, and because `ton`
 without one matches *Washington*.
@@ -440,11 +469,16 @@ more than it sounds: Brazilian, Vietnamese and Colombian outlets break their own
 Portuguese, Vietnamese and Spanish hours before the English wires pick them up, and that gap is
 precisely the window worth having.
 
-**Novelty is a signal input, not a preprocessing step.** The market prices a story on first
+**Novelty is a signal input, not a preprocessing step — but see §1b, which reports evidence
+that the SIGN of this weighting is probably wrong.** The mechanism below is right; whether
+novelty should be up-weighted or down-weighted is an open, testable question, and the code
+currently up-weights it.
+
+ The market prices a story on first
 print. The fortieth syndication carries no information, and counting reprints as independent
 evidence builds a signal that tracks press-release volume instead of the market. In the
-measured corpus, deduplication collapsed 50 documents into 24 clusters — **half the corpus
-was echo**.
+measured corpus, deduplication collapses 33 documents into 29 clusters — **12% echo**
+([MEASUREMENTS.md](MEASUREMENTS.md)).
 
 The companion statistic is **time-to-second-source**. A claim that stays single-sourced for
 hours is either an exclusive, which is valuable, or a fabrication, which is dangerous. Same
@@ -555,6 +589,26 @@ Decompose "event happens" to "signal visible" and the stages we control almost v
 | Satellite AIS | ~1,800 s | ~30 s | **1.6%** |
 | Satellite imagery | ~43,200 s | ~60 s | **0.14%** |
 | Scheduled macro (WASDE, COT) | ~604,800 s data age | ~30 s | **0.005%** |
+
+**This table uses a 30-second pipeline, and §7's own SLO promises p50 90 s and p95 6 min.** At
+those numbers the picture changes materially on the one path where it matters:
+
+| our pipeline | share of the wire path |
+|---|---:|
+| 30 s (the row above) | 9% |
+| 90 s (our own p50) | **23%** |
+| 360 s (our own p95) | **55%** |
+
+At p95 the "irrelevant" pipeline is the *majority* of the wire path. So the claim that
+optimising below 30 seconds returns nothing is defensible only if the pipeline actually runs at
+30 seconds, and ours is specified not to. The honest statement is narrower: **optimising the
+median pipeline is low-value; controlling its tail is not.** The prohibition in §12 is scoped
+accordingly.
+
+Two further caveats on the inputs. The ~300 s wire publication lag is an estimate, not a
+measurement, and the whole argument is proportional to it — at a 60-second wire lag our share is
+33%, not 9%. It is cheap to establish from historical wire timestamps against known event times,
+and until it is, this table is a hypothesis with arithmetic attached.
 
 Halving our pipeline improves what the trader experiences by **4.5% on the best path** and by
 nothing measurable on the others. Meanwhile the largest *controllable* term is not compute at
@@ -694,9 +748,8 @@ missing data.
 
 ## 9. Evaluation, retraining, and the contamination nobody mentions
 
-Two published results are worth naming for how they fail. One reports 50.63% returns over 28
-months from news sentiment and **never mentions transaction costs or slippage**. Another reports
-a **Sharpe ratio of 5.87** on EUR/USD from GDELT sentiment — from free, public data anyone can
+One published result is worth naming for how it fails: a reported **Sharpe ratio of 5.87** on
+EUR/USD from GDELT sentiment — from free, public data anyone can
 download. A Sharpe near 6 over five years implies a t-statistic around 13; nothing in the FX
 literature is within an order of magnitude. Real macro strategies live between 0.5 and 1.5. That
 number is a bug report, not a result.

@@ -7,6 +7,7 @@ output auditable and keeps model drift out of the scoring layer.
 import json
 import pathlib
 import re
+import unicodedata
 import subprocess
 import sys
 import time
@@ -65,9 +66,12 @@ BLOCK = re.compile(
     r"\bcoffee table|\bcoffee shop|\bcoffee bar\b|\bcafe opens|\bbarista|"
     r"\bchildren's book|\bzodiac|\btote bag|\bmakeup|\brecipe|\bmug\b|"
     r"restaurant inspection|\bdrive-through|\bfranchise|\bstore opening|"
-    r"\bnew location|\bclosure of|\bgift guide|\bcold brew\b|\biced coffee|"
-    r"\b\d+% off|\bamazon\b|\bdeal(s)? of the|\bcoffee maker\b|\bkeurig\b|"
-    r"\blatte\b|\bespresso machine|NASDAQ|NYSE|OTCMKTS|\bstock\b|\bshares\b", re.I)
+    r"\bnew location|\bgift guide|\bcold brew\b|\biced coffee|"
+    # NOT "amazon" (drops Amazon deforestation, and EUDR is a signal we want),
+    # NOT "closure of" (drops "closure of the Port of Santos"), NOT "stock"
+    # (drops "ICE certified stock", the most important supply series here).
+    r"\b\d+% off|\bdeal(s)? of the|\bcoffee maker\b|\bkeurig\b|"
+    r"\blatte\b|\bespresso machine|NASDAQ|NYSE|OTCMKTS|\bshares\b", re.I)
 
 ORIGINS = {"BR": "BR_MG", "VM": "VN_CENTRAL_HIGHLANDS", "CO": "CO", "ET": "ET",
            "ID": "ID", "HO": "HN", "UG": "UG", "VN": "VN_CENTRAL_HIGHLANDS"}
@@ -272,7 +276,10 @@ def cluster(docs: list[dict], thresh: float = 0.5) -> list[dict]:
     ponytail: greedy O(n^2) Jaccard. Fine to a few thousand docs/day; swap for
     MinHash+LSH when a single batch stops fitting in a second.
     """
-    docs = sorted(docs, key=lambda d: d["event_time"])
+    # Order by the clock we control. Sorting by event_time let a document ingested
+    # later (but published earlier) claim originality and demote one we already
+    # held -- novelty assigned by a document that did not yet exist.
+    docs = sorted(docs, key=lambda d: (d.get("ingest_time") or d["event_time"]))
     reps: list[tuple[str, set[str]]] = []
     for d in docs:
         sh = _shingles(f"{d.get('title','')} {d.get('snippet','')}")
@@ -296,20 +303,30 @@ def cluster(docs: list[dict], thresh: float = 0.5) -> list[dict]:
 PROMPT = """You extract structured, evidence-backed claims about the COFFEE market from news snippets.
 
 Return ONLY a JSON array. No prose, no markdown fence. One object per claim.
+Put "reasoning" FIRST in every object: one sentence on what the text actually says.
 A document may yield zero, one or several claims. Skip documents that are not about coffee
 markets, supply, trade or policy (cafe openings, recipes, celebrity stories -> no claims).
 
 Each object:
 {
+  "reasoning": "<one sentence: what does this document actually assert?>",
   "url": "<the exact url given>",
   "signal": "supply_risk" | "price_pressure" | "policy_shock",
-  "direction": -1 | 0 | 1,       // price_pressure only: -1 bearish, 1 bullish. Else 0.
+  "balance_effect": "tighter" | "looser" | "neutral",  // does this event tighten or loosen
+                                 // the physical supply/demand balance? A FACT about the world.
+                                 // Never state a price direction; that is computed, not extracted.
   "magnitude": 0.0-1.0,          // how big the implied effect is
-  "confidence": 0.0-1.0,         // how sure the SOURCE is, not how sure you are
+  "source_hedging": 0.0-1.0,     // how firmly the SOURCE asserts it (1.0 = flat assertion,
+                                 // 0.2 = heavily hedged). This is NOT estimator precision.
   "horizon_days": integer,       // when the effect bites
-  "driver": "weather_frost"|"weather_drought"|"weather_rain"|"disease_pest"|"labor"|
+  "driver": "biennial_cycle"|"weather_frost"|"weather_drought"|"weather_rain"|"disease_pest"|"labor"|
             "logistics_port"|"logistics_freight"|"policy_export"|"policy_tariff"|
             "policy_certification"|"fx"|"demand"|"inventory"|"other",
+                                 // biennial_cycle: arabica trees alternate heavy and light
+                                 // years, swinging Brazilian output by 5-10M bags. USDA holds
+                                 // it accounts for most year-to-year variation in global
+                                 // arabica production -- the largest single supply driver,
+                                 // and it is structural rather than news-driven.
   "region": "BR_MG"|"BR_SP"|"BR_ES"|"VN_CENTRAL_HIGHLANDS"|"CO"|"ET"|"ID"|"HN"|"UG"|"GLOBAL"|"OTHER",
   "contract": "arabica"|"robusta"|"both",
   "evidence_quote": "<VERBATIM span copied from the snippet, 10-300 chars>"
@@ -365,7 +382,40 @@ def _knowable_at(d: dict) -> str:
 
 
 def _numbers(s: str) -> set[str]:
-    return set(re.findall(r"\d+(?:[.,]\d+)?", s or ""))
+    """Digit groups, comma separators removed so 1,250 and 1250 compare equal."""
+    return {m.replace(",", "") for m in re.findall(r"\d[\d,]*(?:\.\d+)?", s or "")}
+
+
+def _norm(s: str) -> str:
+    """Normalise before comparing. Naive exact matching rejects a large share of
+    CORRECT quotes on Unicode alone -- smart quotes, non-breaking spaces, soft
+    hyphens, zero-width joiners -- and that presents as a quality problem rather
+    than a parsing one."""
+    s = unicodedata.normalize("NFKC", s or "")
+    for a, b in (("\u2018", "'"), ("\u2019", "'"), ("\u201c", '"'), ("\u201d", '"'),
+                 ("\u2013", "-"), ("\u2014", "-"), ("\u00a0", " "),
+                 ("\u00ad", ""), ("\u200b", ""), ("\u200d", "")):
+        s = s.replace(a, b)
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def ground(quote: str, source: str) -> tuple[bool, bool]:
+    """Return (span_ok, numbers_ok).
+
+    span_ok  -- the WHOLE quote appears in the source after normalisation. An
+                earlier version compared only the first 60 characters of a quote
+                stored to 300, so up to 240 characters of displayed evidence were
+                never verified. A model that copies a real opening and continues
+                into fabrication passed that check.
+    numbers_ok -- every digit group in the quote also appears in the source. The
+                previous implementation was `_numbers(...) or True`, which is
+                always truthy: the number check asserted in the design documents
+                did not exist at all.
+    """
+    if not quote:
+        return False, False
+    q, src = _norm(quote), _norm(source)
+    return (q in src), _numbers(q).issubset(_numbers(src))
 
 
 def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tuple[list[dict], dict]:
@@ -380,7 +430,21 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
     if backend == "replay":
         import pathlib
         fx = pathlib.Path(__file__).resolve().parent.parent / "fixtures" / "claims.jsonl"
-        raw = [json.loads(l) for l in fx.read_text().splitlines() if l.strip()]
+        # Fixture rows carry the url inside payload, not at top level. Resolving
+        # on the missing key returned zero claims and reported success -- exactly
+        # the "quiet news day and a broken ingest are the same observation" failure
+        # this project documents. Resolve on doc_id, which fixtures always carry.
+        raw = []
+        by_doc = {d["doc_id"]: d for d in usable}
+        for line in fx.read_text().splitlines():
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            url = row.get("url") or row.get("payload", {}).get("url")
+            if not url and row.get("doc_id") in by_doc:
+                url = by_doc[row["doc_id"]]["url"]
+            if url:
+                raw.append({**row.get("payload", {}), **row, "url": url})
     else:
         raw = []
         for i in range(0, len(usable), batch):
@@ -403,21 +467,22 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
         d = by_url.get(c.get("url"))
         if not d or c.get("signal") not in SIGNALS:
             continue
-        quote = (c.get("evidence_quote") or "").strip()
+        quote = (c.get("evidence_quote") or "")[:300].strip()
         src = f"{d.get('title','')} {d['snippet']}"
-        # Grounding gate: the span must really exist in the source, and any number
-        # in the claim must appear inside the span. A number the model invented
-        # cannot survive both checks.
-        grounded = bool(quote) and quote[:60].lower() in src.lower()
-        nums_ok = _numbers(json.dumps(c.get("magnitude"))) or True
-        if not grounded:
+        grounded, nums_ok = ground(quote, src)
+        if not grounded or not nums_ok:
             continue
+        eff = (c.get("balance_effect") or "neutral").lower()
         claims.append({
-            "claim_id": uuid.uuid5(uuid.NAMESPACE_URL, d["url"] + quote[:40]).hex[:16],
+            # extractor version is part of the identity: a re-extraction is a new
+            # claim, not an overwrite of the old one.
+            "claim_id": uuid.uuid5(uuid.NAMESPACE_URL,
+                                   d["url"] + quote[:40] + EXTRACTOR).hex[:16],
             "doc_id": d["doc_id"], "signal": c["signal"],
-            "direction": int(c.get("direction") or 0),
+            # Computed from the stated physical effect, never taken from the model.
+            "direction": BALANCE_SIGN.get(eff, 0),
             "magnitude": float(c.get("magnitude") or 0),
-            "confidence": float(c.get("confidence") or 0),
+            "confidence": float(c.get("source_hedging") or c.get("confidence") or 0),
             "horizon_days": int(c.get("horizon_days") or 30),
             "driver": c.get("driver"), "region": c.get("region"),
             "contract": c.get("contract"), "evidence_quote": quote[:300],
@@ -433,15 +498,30 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
 
 # ---------------------------------------------------------------- aggregate
 
-HALFLIFE_D = 5.0
+# A tighter physical balance means a higher price. That mapping is economics, not
+# opinion, so it belongs in code -- not in a "direction" field the model invents.
+# Before this existed the model emitted a price direction directly, which defeated
+# the whole extraction-is-not-prediction principle the design rests on.
+BALANCE_SIGN = {"tighter": 1, "looser": -1, "neutral": 0}
+
+# Per-signal decay. One global half-life made the three signals differ only in their
+# output range -- a tariff is a step function and was decaying like a sentiment blip.
+HALFLIFE_D = {"supply_risk": 5.0, "price_pressure": 2.0, "policy_shock": 45.0}
 
 
 def score(rows, as_of: str | None = None, novelty: dict | None = None) -> dict:
     """Time-decayed, novelty-weighted, confidence-weighted aggregation.
 
-    Weighting by novelty is the point: a claim echoed by 40 outlets is one
-    claim, not forty. Counting reprints as independent evidence is the fastest
-    way to build a signal that tracks press-release volume instead of the market.
+    Weighting by novelty collapses syndication: a claim echoed by 40 outlets is
+    one claim, not forty.
+
+    The SIGN of that weight is an open question and this code takes the side the
+    evidence argues against. Published work on 13 commodity futures including
+    Coffee C finds NOVEL news has no significant lagged effect while OLD repeated
+    news carries the only multi-day dynamic -- and that dynamic is a reversal. See
+    docs/ARCHITECTURE.md section 1b. Running this at novelty weights of +1, 0 and
+    -1 on the same folds is a one-parameter sweep and should precede any further
+    work on extraction quality.
     """
     ref = datetime.fromisoformat(as_of) if as_of else datetime.now(timezone.utc)
     novelty = novelty or {}
@@ -449,11 +529,21 @@ def score(rows, as_of: str | None = None, novelty: dict | None = None) -> dict:
     for sig in SIGNALS:
         num = den = 0.0
         n = 0
+        hl = HALFLIFE_D[sig]
         for r in rows:
             if r["signal"] != sig or r["injection_flag"]:
                 continue
-            age = max((ref - datetime.fromisoformat(r["event_time"])).total_seconds() / 86400, 0)
-            w = (0.5 ** (age / HALFLIFE_D)) * (r["confidence"] or 0) * novelty.get(r["doc_id"], 1.0)
+            age_d = (ref - datetime.fromisoformat(r["event_time"])).total_seconds() / 86400
+            # A publisher-declared event_time in the FUTURE used to clamp to age 0,
+            # i.e. maximum weight forever, and nothing caught it because ingest_time
+            # was legitimately in the past. Source timestamps are self-reported and
+            # a measurable fraction are wrong; treat a future date as unusable.
+            if age_d < -0.02:
+                continue
+            age = max(age_d, 0)
+            # source_hedging weights how firmly the source asserts, NOT how precise we
+            # think it is. Naming it "confidence" invited exactly the wrong reading.
+            w = (0.5 ** (age / hl)) * (r["confidence"] or 0) * novelty.get(r["doc_id"], 1.0)
             if w <= 0:
                 continue
             v = (r["magnitude"] or 0) * (r["direction"] if sig == "price_pressure" else 1)
@@ -470,9 +560,12 @@ def score(rows, as_of: str | None = None, novelty: dict | None = None) -> dict:
     return out
 
 
-def run(backend: str = "claude-cli", timespan: str = "3d", db=None) -> dict:
+def run(backend: str = "claude-cli", batches: int = 24, db=None) -> dict:
+    """`timespan` used to be the parameter here and it was swallowed by fetch's
+    **_, so batch count was unreachable and the API's call signature did not
+    match. Every /v1/refresh threw."""
     conn = connect(db)
-    docs = cluster(fetch(timespan=timespan))
+    docs = cluster(fetch(n_batches=batches))
     new = upsert_documents(conn, docs)
     for d in docs:
         conn.execute("UPDATE documents SET cluster_id=?, novelty=? WHERE doc_id=?",

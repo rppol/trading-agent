@@ -103,9 +103,14 @@ def upsert_documents(conn, docs: list[dict]) -> int:
 
 
 def insert_claims(conn, claims: list[dict]) -> int:
+    """Append only. INSERT OR REPLACE was used here and it silently defeated the
+    entire bitemporal design: re-running extraction after a prompt change
+    overwrote the existing row AND its ingest_time, destroying the record of what
+    was known when. Claim ids carry the extractor version, so a re-extraction now
+    lands as a NEW row alongside the old one, which is what a correction is."""
     for c in claims:
         conn.execute(
-            """INSERT OR REPLACE INTO claims
+            """INSERT OR IGNORE INTO claims
                (claim_id,doc_id,signal,direction,magnitude,confidence,horizon_days,
                 driver,region,contract,evidence_quote,injection_flag,verified_number,
                 event_time,ingest_time,extractor,payload)
