@@ -96,11 +96,26 @@ concrete instance of the argument in [ARCHITECTURE §1b](ARCHITECTURE.md): a sup
 can be accurate and still carry no tradeable information, because the price is already being set
 by a larger factor the indicator says nothing about.
 
-**3. It was never a news problem.** The disambiguating document was an exchange rule filing. The
-disambiguating data was a spreadsheet on a public URL. Neither is in the news corpus at any
-volume — [MEASUREMENTS.md](MEASUREMENTS.md) records that wire and institutional domains are at
-hard zero in 675,840 GDELT documents. A better extractor, a better prompt or a bigger model would
-not have found this. **A cron job and a parser would have.**
+**3. The edge was interpretation, not detection — and an earlier draft of this section got that
+wrong.** It implied the rule was buried. It was not: Reuters reported the ICE rule change on
+**30 September 2023**, the day after it was announced, and a niche trading blog connected it to
+stock levels on **12 October**, before the low was even confirmed.
+
+What actually happened is narrower and more interesting. On **2 November 2023** the mainstream
+commentary reported the 24-year low and framed it as physical-versus-futures arbitrage, **with no
+mention of the rule at all**. Explicit attribution did not arrive until **30 November** — 28 days
+later, and the same day the rule took effect.
+
+So the information was fully public the whole time and **the commentary misframed a mechanical
+drawdown as a supply signal for a month**. That is a real gap, and it is not one a faster news
+pipeline closes. It is closed by holding the rule filing and the daily stock file in the same
+place, joined by date, so the mechanical explanation is available at the moment the number moves.
+
+**And the same correction applies to the November 2022 episode.** An earlier draft implied nobody
+was watching the pending queue. Reuters reported the queue — "more than 160,000 bags" pending,
+"at least another 100,000 on their way" — **in the same article, on the same day** as the 23-year
+low, on 4 November 2022. The queue was public and reported. Being right about it was not
+proprietary.
 
 **4. The interpretation trap is the real lesson.** The queue in October–November 2023 was
 substantially *recycled* inventory racing a deadline, not new supply arriving. The same number
@@ -242,11 +257,18 @@ band beside the number so it cannot be quoted without it. What the replay demons
 **the detector fires on the right dates for the right reasons, deterministically, with no model
 in the loop** — not that the signal pays.
 
-Two limits on this run, both real: the cached series is irregularly sampled (dense around the
-2023 window, weekly elsewhere), so "42 sessions" is not 42 uniform trading days; and **the
-lead-time claim — how far ahead of the trade commentary these alerts fired — is unmeasured**,
-because establishing the commentary dates is a separate research task that has not completed.
-Until it does, this is a detection result without its comparison arm.
+Three limits on this run. The cached series is irregularly sampled (dense around the 2023
+window, weekly elsewhere), so "42 sessions" is not 42 uniform trading days.
+
+**And the lead-time arm, now measured, does not support a detection edge.** The detector's
+2023-12-11 alert fired *after* Reuters had reported the rule (30 Sep), after a blog had linked it
+to stocks (12 Oct), and after the mainstream had attributed the low to it (30 Nov). On this
+episode the system would have been **last, not first**.
+
+What it would have been is *consistently right* — mechanically, on every episode, without needing
+an analyst to notice. The commentary got there eventually and by hand; the value proposition is
+coverage and consistency, not speed. **That is a materially weaker claim than the one this case
+study originally implied, and it is the one the evidence supports.**
 
 ## Reproducing it
 
