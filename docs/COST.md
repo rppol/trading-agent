@@ -245,6 +245,37 @@ our own signals before committing; be prepared for the real-time bill to be corr
 
 ---
 
+## 6b. The LLM line, re-priced — and it gets smaller, not larger
+
+The $196/month above assumed a frontier small model for the triage tier. **That was the wrong tier
+for the job**, and correcting it moves the number down rather than up (SERVING.md §2).
+
+Triage is a ~1,000-token input with a ~20-token output — a binary classification. An 8B-class
+model on a cheap-inference provider prices it at **$0.02/$0.04 per M**, roughly **53x cheaper per
+document** than the ~$1/$5 tier. Extraction stays on a frontier mid model, correctly, because it
+is correctness-critical and only ~1–5% of documents reach it.
+
+| | Old assumption | Corrected |
+|---|---|---|
+| Triage tier | ~$1/$5 per M | **~$0.02/$0.04 per M** |
+| Extraction tier | frontier mid | unchanged — do not cheap out here |
+| **Text LLM total** | ~$196/mo | **well under $100/mo** |
+
+**Which strengthens the headline rather than qualifying it.** The LLM was 0.4% of the bill; priced
+correctly it is nearer 0.2%. **Every hour spent optimising tokens is an hour not spent on the 51%
+that is data licensing**, and that misallocation is the actual finding of this document.
+
+Two operational notes that matter more than the rate:
+
+- **Prompt caching is a net loss unless extraction calls are batched.** The prefix is ideal caching
+  material, but a request arriving after the cache TTL is a fresh *write* at 1.25x that no read
+  ever amortises. Window extraction into 15–30 minute batches (SERVING.md §3).
+- **Self-hosting does not save money at any volume here.** A GPU at 100% utilisation costs ~11x the
+  hosted rate for the cheap tier. What eventually forces a dedicated deployment is **capacity**,
+  not price.
+
+---
+
 ## 7. Costs this model deliberately excludes
 
 Honest omissions, each of which can dominate:
