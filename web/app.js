@@ -399,6 +399,7 @@ const ROUTES = {
   "#/measurements": { doc: "MEASUREMENTS.md", surface: "paper" },
   "#/wheat": { doc: "WHEAT.md", surface: "paper" },
   "#/edge": { doc: "EDGE.md", surface: "paper" },
+  "#/pipeline": { doc: "PIPELINE.md", surface: "paper" },
 };
 
 async function render() {
