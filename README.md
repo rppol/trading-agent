@@ -19,33 +19,35 @@ cached queries and minutes for fresh inference.
 | 1 | Architecture document with diagrams | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 2 | Working prototype — GDELT → LLM → API | this repo, `make all` |
 | 3 | Failure modes, detection and mitigation | [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md) |
+| + | What was tested, and what died | [docs/EVIDENCE.md](docs/EVIDENCE.md) |
 | 4 | Back-of-envelope cost estimate | [docs/COST.md](docs/COST.md) + interactive model on the site |
 
 ## The short version
 
-**Wire services and primary institutions are absent from GDELT as identified sources.**
-`reuters.com`, `apnews.com`, `bloomberg.com`, Cecafé, Conab and the ICO return zero documents
-across 675,840. Their content arrives only as syndicated republication — second-hand, delayed,
-and stripped of the attribution you would weight it by. An earlier draft concluded from this
-that the signal was simply absent; that was wrong, and the correction is the first section of
-[the architecture document](docs/ARCHITECTURE.md).
+**Extraction is not prediction.** The LLM turns prose into typed, cited claims. Arithmetic turns
+claims into signals. The model never emits a price, an invented direction, or a probability —
+which keeps the output auditable and keeps pretraining contamination out of the predictor.
 
-**The volumes in the brief are a misdirection.** 10M AIS pings/day is 116 messages a second.
-500 documents a day is about $9 of tokens. Only the imagery is genuinely large, and its cost
-is the licence, not the compute.
+**Two clocks, from the first row.** Every record stores `event_time` and `ingest_time`;
+point-in-time reads filter on the second. This cannot be retrofitted — you can always recover
+when something happened, never when you learned it.
 
-**Extraction is not prediction.** The LLM turns prose into typed, cited claims. Arithmetic
-turns claims into signals. The model never emits a price, a direction it invented, or a
-probability — which keeps the output auditable and keeps pretraining contamination out of
-the predictor.
+**Fuse at the claim, never at the tensor.** Text, imagery, AIS and price are commensurable as
+*typed claims about a canonical entity*, each carrying a pointer to its own evidence — a character
+span, an AOI polygon, a track window. A joint embedding averages a cheap lie with an expensive
+fact and is unauditable when the number moves.
 
-**Two clocks, from the first row.** Every record stores `event_time` and `ingest_time`.
-Point-in-time reads filter on the second. This cannot be retrofitted, and without it no
-backtest is honest.
+**The volumes in the brief are a misdirection.** 10M AIS pings/day is 116 messages a second. Only
+imagery is genuinely large, and its cost is the licence, not the compute — **tasking policy alone
+is 96% of the gap** between a careless build and a staged one.
 
-**Physical evidence is expensive to forge.** An attacker can write an article; they cannot
-move 200,000 tonnes of coffee. Cross-modal corroboration is both the confidence model and
-the defence against planted news.
+**The LLM is 0.2% of the bill.** Licensing and people are 53–76%.
+
+**Most of what we believed did not survive measurement.** A gas→urea→coffee chain where the cause
+peaked six months *after* the effect. A "buried" ICE rule Reuters reported the next day. A
+positioning hypothesis that was real in magnitude and backwards in mechanism. A parser silently
+reading 0% of two years of its own source. [EVIDENCE.md](docs/EVIDENCE.md) is the record, and it
+is the part that distinguishes this from a design nobody tried to falsify.
 
 ## Run it
 

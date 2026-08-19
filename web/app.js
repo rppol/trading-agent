@@ -393,18 +393,7 @@ const ROUTES = {
   "#/failure-modes": { doc: "FAILURE_MODES.md", surface: "paper" },
   "#/cost": { render: viewCost, bind: bindCost, surface: "paper" },
   "#/cost-doc": { doc: "COST.md", surface: "paper" },
-  "#/case": { doc: "CASE_STUDY.md", surface: "paper" },
-  "#/orchestration": { doc: "ORCHESTRATION.md", surface: "paper" },
-  "#/sources": { doc: "SOURCES.md", surface: "paper" },
-  "#/measurements": { doc: "MEASUREMENTS.md", surface: "paper" },
-  "#/wheat": { doc: "WHEAT.md", surface: "paper" },
-  "#/edge": { doc: "EDGE.md", surface: "paper" },
-  "#/pipeline": { doc: "PIPELINE.md", surface: "paper" },
-  "#/learning": { doc: "LEARNING.md", surface: "paper" },
-  "#/stack": { doc: "STACK.md", surface: "paper" },
-  "#/scale": { doc: "SCALE.md", surface: "paper" },
-  "#/storage": { doc: "STORAGE.md", surface: "paper" },
-  "#/serving": { doc: "SERVING.md", surface: "paper" },
+  "#/evidence": { doc: "EVIDENCE.md", surface: "paper" },
 };
 
 async function render() {
