@@ -401,6 +401,7 @@ const ROUTES = {
   "#/edge": { doc: "EDGE.md", surface: "paper" },
   "#/pipeline": { doc: "PIPELINE.md", surface: "paper" },
   "#/learning": { doc: "LEARNING.md", surface: "paper" },
+  "#/stack": { doc: "STACK.md", surface: "paper" },
 };
 
 async function render() {
