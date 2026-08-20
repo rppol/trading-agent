@@ -35,11 +35,9 @@ flowchart TB
   class SIG,API out
 ```
 
-**Read it in three moves.** Left of the gate the system is *reducing* — 96,405 documents a day
-become 4.7 tradeable claims. At the gate it is *verifying* — nothing enters the store whose
-evidence cannot be pointed at. Right of the store it is *deterministic* — arithmetic, not a model,
-turns claims into signals. The two feedback edges are the only cycles: agents enrich claims, and
-the learning loop retunes the cascade.
+**Three moves.** Before the gate: *reducing* — 96,405 documents/day to 4.7 claims. At the gate:
+*verifying* — nothing enters unless its evidence can be pointed at. After: *deterministic* —
+arithmetic, not a model, makes the signal. The two feedback edges are the only cycles.
 
 ---
 
@@ -71,10 +69,10 @@ max achievable IR = 0.0301 × √260 = 0.486
 **You cannot buy IR 0.5 by adding commodities at weekly rebalance. Ever.** Going from 1 commodity
 to 20 multiplies IR by ~2.0x, not 4.5x.
 
-So the engineering mandate — **nothing hardcoded to one commodity** — is real but narrower than it
-sounds. Tested against wheat: the claim schema, two clocks, grounding gate and dedup transfer;
-the multi-venue resolver, class-spread engine and government-action ingestion do not. **N+1 is
-cheap for scaffolding, not for the pipeline** (EVIDENCE §3).
+The mandate — **nothing hardcoded to one commodity** — is real but narrow. Tested against wheat:
+claim schema, two clocks, gate and dedup transfer; multi-venue resolver, class-spread engine and
+government-action ingestion do not. **N+1 is cheap for scaffolding, not the pipeline**
+(EVIDENCE §3).
 
 ---
 
@@ -116,10 +114,9 @@ when you learned it. One column now, or an honest backtest never.
 
 ## 5. Heterogeneous data: fuse at the claim, never at the tensor
 
-The reflex is to embed text, imagery and series into a shared latent space. **Wrong level, for
-four checkable reasons:** no shared time base (a satellite pass is 5–6 days, a tick is 100ms, and
-the relative timing *is* the signal); forgeability differs by orders of magnitude; a joint
-embedding is **unauditable**; and the modalities have three incompatible revision policies.
+The reflex is a shared latent space. **Wrong level, for four reasons:** no shared time base (a
+pass is 5–6 days, a tick 100ms — and the relative timing *is* the signal); forgeability differs by
+orders of magnitude; a joint embedding is **unauditable**; three incompatible revision policies.
 
 The level at which they are commensurable is the **claim**. Every modality is a sensor emitting a
 typed measurement about a canonical entity, with a pointer to its own evidence:
@@ -153,21 +150,18 @@ flowchart LR
 "Sul de Minas" in Portuguese prose, an AOI polygon, and a port call at Santos are the same subject
 only because a canonical temporal entity resolves all three.
 
-**Absence means something different in every modality, and conflating the two kinds is how
-multimodal systems break silently.** Cloud is not "no damage"; a dark vessel is not "not sailing";
-a failed fetch is not a flat line. Every claim carries an **observation status** —
-`observed`, `observed_absent`, `not_observed`, `degraded` — and an unmeasured signal **widens its
-interval rather than narrowing it**. SAR over optical in the coffee belt follows directly: radar
-penetrates the cloud that blinds optical exactly during the wet season.
+**Absence differs per modality, and conflating the two kinds breaks multimodal systems
+silently.** Cloud is not "no damage"; a dark vessel is not "not sailing"; a failed fetch is not a
+flat line. Every claim carries an **observation status** — `observed`, `observed_absent`,
+`not_observed`, `degraded` — and unmeasured **widens the interval, never narrows it**. Hence SAR
+over optical: radar sees through the cloud that blinds optical exactly during the wet season.
 
 **Mixed frequency uses as-of joins, never resampling.** Weekly positioning stays weekly, daily
 imagery stays daily; the model sees the lags explicitly rather than averaged away.
 
-**Confidence is per-modality, and physical evidence dominates.** Three agreeing articles are one
-cheap fact repeated. An article *plus* a draught change *plus* an AOI delta is a fact someone
-would have to spend real money to fake — so **high-conviction signals require corroboration from a
-physical modality.** That single rule is both the adversarial-news defence and the confidence
-model, which is the argument for it.
+**Confidence is per-modality.** Three agreeing articles are one cheap fact repeated; an article
+plus a draught change plus an AOI delta costs real money to fake. So **high conviction requires a
+physical modality** — one rule serving as both the adversarial defence and the confidence model.
 
 ---
 
@@ -227,20 +221,18 @@ normalised. This is the system's referee and it is deterministic.
 
 Two rules that make it real rather than decorative:
 
-- **Verify against the original document, never the chunk.** If the gate resolves against the
-  chunk, a fabrication straddling a boundary verifies clean — the gate would confirm the model's
-  own input. Chunks carry `char_offset` back into the snapshot.
-- **A check that cannot fail is worse than no check**, because it reports as passing. This
-  codebase shipped `nums_ok = _numbers(...) or True` — a number gate that never existed while
-  being claimed in three places.
+- **Verify against the original, never the chunk.** Resolve against the chunk and a fabrication
+  straddling a boundary verifies clean — the gate confirms the model's own input. Chunks carry
+  `char_offset` back into the snapshot.
+- **A check that cannot fail is worse than none**, because it reports as passing. This codebase
+  shipped `nums_ok = _numbers(...) or True` — a gate claimed in three places that never existed.
 
 ### Chunking
 
-**Most documents are not chunked.** A trading claim is not local: a number in paragraph six is
-meaningless without the subject in paragraph one, and wire stories fit one context. Chunking
-applies only to analyst PDFs and transcripts, where the rules are: split on **structural
-boundaries** never fixed token counts; **never separate a number from its unit or subject**; carry
-a document-level header into every chunk; and store `char_offset`.
+**Most documents are not chunked.** A number in paragraph six is meaningless without the subject
+in paragraph one, and wire stories fit one context. Chunking is for analyst PDFs and transcripts
+only: split on **structural boundaries**, **never separate a number from its unit or subject**,
+carry a document header into every chunk, store `char_offset`.
 
 **No summarisation before indexing.** The gate verifies verbatim spans; a summary leaves nothing
 to check. Every shipped precedent agrees — contextual retrieval *prepends* a blurb and never
@@ -284,10 +276,10 @@ flowchart TB
 | **History** | **a `WHERE` clause** on `(entity_id, time_range)` |
 | **Corroboration** | the only genuine hybrid search |
 
-**Hybrid search is insurance against disjoint failure modes**, not a silver bullet: BM25 cannot
-connect "Sul de Minas" to "South of Minas"; dense collapses on rare tokens — contract codes, lot
-numbers, exact figures. But fusion itself buys ~1–1.7%. Use RRF (k=60) until corroboration
-accept/reject decisions supply a label set, then a tuned convex combination.
+**Hybrid is insurance against disjoint failure modes**, not a silver bullet. BM25 cannot connect
+"Sul de Minas" to "South of Minas"; dense collapses on rare tokens — contract codes, exact figures.
+Fusion itself buys ~1–1.7%. RRF (k=60) until accept/reject decisions supply labels, then a tuned
+convex combination.
 
 **A reranker would actively harm two jobs** — for novelty it ranks the duplicate highest, exactly
 backwards; for corroboration it has no notion of publisher independence and ranks two syndicated
@@ -321,63 +313,46 @@ flowchart LR
   class PG store
 ```
 
-**The dotted edges are the load-bearing part.** The gate resolves a span against the *snapshot*,
-never the chunk — otherwise a fabrication straddling a chunk boundary verifies clean, because the
-text does exist in the fragment the model was handed.
+**The dotted edges carry the load.** The gate resolves a span against the *snapshot*, never the
+chunk — otherwise a fabrication straddling a boundary verifies clean.
 
-**One Postgres instance holds everything.** At the pilot's volume a dedicated vector database
-solves a problem we do not have.
+**One Postgres holds everything.** At this volume a dedicated vector database solves a problem we
+do not have.
 
-**Bitemporality with range types, not an extension** — no maintained bitemporal Postgres
-extension exists, and this is the most correctness-critical table in the system:
+**Bitemporality via range types, not an extension** (none is maintained, and this is the most
+correctness-critical table here):
 
 ```sql
 EXCLUDE USING gist (
   claim_key       WITH =,
-  effective_range WITH &&,   -- event_time axis
-  asserted_range  WITH &&    -- ingest_time axis
+  effective_range WITH &&,   -- event_time
+  asserted_range  WITH &&    -- ingest_time
 )
 ```
 
-Composite B-tree `(claim_key, ingest_time DESC)` serves both the `as_of` filter and
-latest-version-per-claim. Append-only: never `UPDATE`, insert a new version. Build the
-materialised "current" view and vacuum monitoring on day one.
+Composite B-tree `(claim_key, ingest_time DESC)` serves the `as_of` filter and
+latest-version-per-claim. Append-only; materialised "current" view and vacuum monitoring on day one.
 
-**The pgvector cliff is a RAM cliff, and it arrives earlier than the vector-count ceiling
-suggests.** Measured on a 32GB box at 1536 dims: QPS held at ~2,100 to 2M vectors, fell 45% at
-2.5M when the index passed `shared_buffers`, and **collapsed 95% by 3M — to 102 QPS — while the
-buffer hit ratio stayed above 98%**, so nothing looked wrong in the metric people watch.
+| Finding | Number | Consequence |
+|---|---|---|
+| **pgvector's cliff is RAM, not vector count** | 32GB box, 1536 dims: ~2,100 QPS to 2M, **−45% at 2.5M**, **−95% by 3M (102 QPS)** — with buffer hit ratio still >98% | `halfvec`, `shared_buffers` above index size, truncate to 512 dims (retains 94–96% NDCG@10). Ceiling: **~10M provisioned, ~3M not** |
+| **Filtered search collapses** | one broad filter → **90.8%** recall; AND of two → **39.7%** | Pre-filtering fragments the HNSW graph, post-filtering silently returns zero. **pgvector 0.8+ iterative scans are load-bearing** |
+| **Multilingual excludes the finance embedders** | sources are PT/VI/ES; no finance-tuned embedder demonstrates coverage | Keep the index multilingual; take finance lift from a downstream reranker |
 
-Mitigations: `halfvec`, `shared_buffers` sized above the index, and truncation. At the chosen
-1024-dim embedder — or truncated to 512, which retains 94–96% of NDCG@10 — the index is
-proportionally smaller than the 1536-dim measurement above. **The ceiling is ~10M vectors
-provisioned properly, ~3M if not.**
-
-**Filtered vector search degrades far worse than expected, and our filters are the bad case.** A
-single broad filter drops recall to **90.8%**; an AND over two broad values to **39.7%**.
-Pre-filtering fragments the HNSW graph; post-filtering silently returns too few or zero. **pgvector
-0.8+ iterative index scans are load-bearing.**
-
-**Embeddings: multilingual is the binding constraint, and it excludes the finance-tuned models.**
-Sources are Portuguese, Vietnamese and Spanish; the finance-specific embedders show real
-finance-retrieval lift and **none has demonstrated coverage of those languages**. Take finance lift
-from a downstream reranker instead.
-
-**Metadata that earns its place:** `char_start`/`char_end` (required — this is what makes
-"embed raw" usable by the gate), `publisher_independence_id` (the corroboration filter),
-`event_time`/`ingest_time`, `entity_ids[]`, `language`, `observation_status`, and the lineage
-quartet `trace_id` / `prompt_version` / `extractor_version` / `embedding_model_version`.
+**Metadata that earns its place:** `char_start`/`char_end` (what makes "embed raw" usable by the
+gate), `publisher_independence_id` (the corroboration filter), the two clocks, `entity_ids[]`,
+`language`, `observation_status`, and lineage — `trace_id`, `prompt_version`, `extractor_version`,
+`embedding_model_version`.
 
 ### Feature store, sized honestly
 
-We have point-in-time correctness at **hundreds** of entities, not train/serve skew at millions.
-So: **one Postgres table for offline, one Redis hash for online, and a single transform function
-imported by both paths.** Skew is prevented by there being literally one function — stronger at
-this scale than a registry two code paths consult.
+Point-in-time correctness at **hundreds** of entities, not skew at millions. So **one Postgres
+table offline, one Redis hash online, one transform function imported by both** — skew prevented
+by there being literally one function.
 
-Adopt a real feature store when several models share features, several teams author transforms,
-or online reads pass a few thousand/second. **What must not be deferred at any scale:** every
-feature vector records the `ingest_time` watermark it was built under.
+Adopt a real one when several models share features, several teams author transforms, or online
+reads pass a few thousand/second. **Never deferred at any scale:** every feature vector records
+the `ingest_time` watermark it was built under.
 
 ---
 
@@ -390,10 +365,9 @@ Three signals of deliberately different statistical character: `supply_risk` (0�
 **Regime conditioning is why positioning matters.** Identical news is bullish in a tight market and
 noise in a glut.
 
-**Tested over 519 weekly observations, the contrarian trade is dead:** r = −0.007, indistinguishable
-from zero. The magnitude claim survives (crowding correlates with |return|, t = +2.79) but **the
-mechanism is backwards** — the middle of the crowding distribution moves most, not the tails.
-Reported here rather than quietly dropped, because that is the whole method.
+**Over 519 weekly observations the contrarian trade is dead:** r = −0.007. The magnitude claim
+survives (crowding vs |return|, t = +2.79) but **the mechanism is backwards** — the middle of the
+distribution moves most, not the tails. Reported rather than dropped.
 
 ## 10. Serving: promise freshness, not latency
 
@@ -430,17 +404,17 @@ is why every payload carries its own staleness.
 
 ## 11. Model serving
 
-| Workload | Choice | Why |
-|---|---|---|
-| **Triage** (everything) | hosted 8B-class, no batch | it gates the pipeline, so latency matters. **Pricing it at a frontier small model costs ~53x more per document** |
-| **Extraction** (~1–5%) | hosted frontier mid, **batched into 15–30 min windows** | correctness-critical. Batching is what makes prompt caching pay — outside the TTL every call is a fresh *write* at 1.25x that no read amortises |
-| **Embeddings** | hosted, batch the backfill | $50–350 one-time |
-| **Vision** | general VLM for the language layer, **a geospatial foundation model for pixels** | general VLMs are documented-weak at counting and localisation on satellite imagery |
+| Workload | Choice |
+|---|---|
+| **Triage** (everything) | hosted 8B-class, no batch — it gates the pipeline |
+| **Extraction** (~1–5%) | hosted frontier mid, **batched into 15–30 min windows** |
+| **Embeddings** | hosted, batch the backfill |
+| **Vision** | general VLM for language, **a geospatial foundation model for pixels** |
 
-**Self-hosting the cheap tier cannot win at any volume** — a GPU at *100% utilisation* is ~11x the
-hosted rate. It is a pricing-floor problem, not a utilisation problem. What eventually forces a
-dedicated deployment is **capacity**, not cost. If it happens, **SGLang** — RadixAttention is the
-textbook fit for a fixed prefix with a varying suffix, and it hides constrained-decoding overhead.
+Self-hosting the cheap tier cannot win at any volume, extraction break-even is ~15x this volume,
+and caching only pays if extraction is batched. Arithmetic in [COST.md](COST.md) §4.
+
+---
 
 ## 12. Orchestration: workflows, with two exceptions
 
@@ -473,9 +447,9 @@ tracing surface, not a state machine — and the design says so rather than pret
 path needed a planner. Only the right box uses checkpointing, resumability and interrupts.
 
 **Most of this pipeline is not agentic and should not be.** Triage, extraction, grounding, scoring
-and serving are a fixed sequence with known inputs. Two jobs genuinely warrant agency because the
-step count is unknown in advance: the **corroboration hunt** and **contradiction resolution** —
-both with a hard step budget, a wall-clock cap, and partial results rather than a loop.
+and serving are a fixed sequence. Two jobs warrant agency because the step count is unknown:
+**corroboration hunt** and **contradiction resolution** — each with a step budget, a wall-clock
+cap, and partial results rather than a loop.
 
 What the evidence says, since these patterns are usually chosen by fashion:
 
@@ -507,10 +481,10 @@ stateDiagram-v2
   Unresolved --> [*]
 ```
 
-**Three terminal states, and `Unresolved` is a first-class result.** An agent that cannot finish
-returns partial evidence and lowers the claim's confidence — it never loops, and it never
-adjudicates by asking a second model to agree. Every tool it holds is read or search only: no
-write, no send, which breaks the lethal trifecta even inside the agentic component.
+**Three terminal states, and `Unresolved` is first-class.** An agent that cannot finish returns
+partial evidence and lowers confidence — it never loops, and never adjudicates by asking a second
+model to agree. Tools are read/search only: no write, no send, breaking the lethal trifecta inside
+the agent too.
 
 **Fan out by lens, not by volume.** Three agents asking the same question produce correlated
 agreement that reads as confirmation. Three with different remits produce information.
@@ -572,12 +546,11 @@ flowchart TB
   class RJ bad
 ```
 
-The model critiquing itself does not work. What does is that this architecture already generates
-five free label sources: **grounding-gate rejections** (zero cost, mechanical, immediate), the
-**official release** scoring outstanding nowcasts, **analyst confirm/reject** in the UI,
-**corroboration outcome** (the exclusive-versus-fabrication discriminator), and **cascade
-disagreement** — which is active learning for free, since the set where cheap and expensive models
-disagree is exactly the set worth labelling.
+The model critiquing itself does not work. What works is that the architecture already emits five
+free label sources: **gate rejections** (mechanical, immediate), the **official release** scoring
+outstanding nowcasts, **analyst verdicts**, **corroboration outcome**, and **cascade
+disagreement** — free active learning, since where cheap and frontier models disagree is exactly
+what is worth labelling.
 
 **What may learn, and what never may:**
 
@@ -589,25 +562,23 @@ disagree is exactly the set worth labelling.
 while the system gets worse. Everything in the right column is what a self-improving loop would
 eventually optimise away, because relaxing a constraint always improves the watched metric.
 
-**The spiral:** the system poisons its own training set. A wrong extraction the reviewer misses
-enters the golden set and teaches the next generation the same error with more confidence — and
-it is silent, because the metric is computed against the contaminated set. Mitigations: **blind
-labelling** on a fixed fraction (the only one that breaks the anchoring), a **frozen holdout**
-never used for training, and label provenance. **Detection is the gap between live-golden and
-frozen-holdout performance** — the only measurement the loop cannot game.
+**The spiral:** a wrong extraction the reviewer misses enters the golden set and teaches the next
+generation the same error — silently, since the metric is computed against the contaminated set.
+Mitigations: **blind labelling** on a fixed fraction (the only one that breaks anchoring), a
+**frozen holdout**, label provenance. **Detection is the live-golden vs frozen-holdout gap** — the
+only measurement the loop cannot game.
 
 ### Monitoring is four planes
 
-**Trace** (spans, tokens, latency, prompt version) — the vendor gives you this. **Data** (publisher,
-language and length mix; arrival gaps), **quality** (gate rejection rate, calibration, nowcast
-error), **cost** ($/claim, cache-hit rate) — you build these.
+**Trace** (spans, tokens, latency, prompt version) comes from the vendor. **Data** (publisher,
+language, length mix, arrival gaps), **quality** (gate rejections, calibration, nowcast error) and
+**cost** ($/claim, cache-hit rate) you build.
 
 **The lineage no vendor supplies is trace → claim → signal → outcome six weeks later.** Every claim
-row carries `trace_id` and the version quartet, or "the model got worse in March" is unanswerable.
+carries `trace_id` and the version quartet, or "the model got worse in March" is unanswerable.
 
 **Continuous ablation.** Monthly, pull each component and measure both sides. The resulting
-marginal-value-per-dollar table doubles as the **degradation order** when the budget governor
-fires — which matters because volume spikes exactly when the system is most valuable.
+marginal-value-per-dollar table *is* the degradation order when the budget governor fires.
 
 ---
 
@@ -655,23 +626,18 @@ flowchart TB
   class MOD,FEED,OBS ext
 ```
 
-**Three properties this topology is chosen for.**
+**Why this shape:**
 
-**No third party sits on the request path.** Workers poll feeds and models on their own schedule
-and write to Postgres; the API only ever reads. A throttled or failing upstream degrades
-freshness, which the payload reports, rather than returning an error to a trader.
-
-**The state layer is one database plus a cache.** Claims, embeddings and features share a
-transaction boundary, which is what makes an embedding and the claim citing it commit together.
-Object storage holds immutable snapshots because they are write-once and large.
-
-**Observability spans all three compute components**, and the trace id it emits is written into
-the claim row — otherwise an outcome arriving six weeks later has nothing to attribute to.
-
-**Scaling order**, when it is needed: workers scale horizontally first (they are stateless), then
-Postgres gains read replicas, then the vector index moves out. Ingestion becomes a real broker
-only when three or more independent consumers need replay — not for throughput, which one box
-handles at these volumes.
+- **No third party on the request path.** Workers poll feeds and models on their own schedule and
+  write; the API only reads. A failing upstream degrades freshness — which the payload reports —
+  rather than erroring at a trader.
+- **One database plus a cache.** Claims, embeddings and features share a transaction boundary, so
+  an embedding and the claim citing it commit together. Object storage holds snapshots: write-once
+  and large.
+- **Observability spans all three compute components**, and its trace id is written into the claim
+  row — otherwise an outcome arriving six weeks later has nothing to attribute to.
+- **Scaling order:** stateless workers first, then read replicas, then the vector index moves out.
+  A real broker only when 3+ independent consumers need replay — never for throughput.
 
 ---
 
