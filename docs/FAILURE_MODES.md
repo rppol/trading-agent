@@ -8,6 +8,9 @@ something, never on an error.
 Each entry is **mechanism → detection → mitigation**. The ones with numbers were found while
 building this, not copied from a checklist.
 
+**Thirty-one modes in five groups.** The five the brief names come first, then five that are
+specific enough to this design to deserve prose, then the rest grouped by where they originate.
+
 ---
 
 ## The five the brief names
@@ -93,7 +96,94 @@ assertion, it does not update the old one.
 
 ---
 
+## Backfill silently destroys point-in-time correctness
+
+**Mechanism.** A backfill job re-processes historical documents — a new extractor version, a
+recovered source, a fixed parser. The obvious implementation writes the resulting claims with
+`ingest_time = now()`, because that is when the row was created. Every one of those claims is now
+stamped as having been known today, and the historical record it was meant to repair is instead
+overwritten with a present-day view.
+
+**Why it is worse than it sounds.** It does not corrupt the data visibly — the claims are correct,
+the spans are real, the gate passed. It corrupts the *answer to a different question*: any
+`as_of` query before the backfill now returns either nothing (the claims postdate it) or, if the
+job back-dated `event_time` only, a record that looks like foresight. **A backtest run after a
+backfill measures a system that could not have existed.**
+
+**Detection.** A monotonicity assertion on point-in-time reads, and an alert on any write whose
+`ingest_time` is more than a few minutes from wall-clock. Backfilled rows should be *countable*:
+a `provenance` column distinguishing live ingest from replay.
+
+**Mitigation.** A backfill writes the `ingest_time` the document **would have had** — derived from
+the snapshot's fetch timestamp, which is why snapshots carry one — or it writes to a separate
+assertion range and is excluded from point-in-time reads by default. Never `now()`.
+
+---
+
+## The moat is also a leakage vector
+
+**Mechanism.** Entity resolution improves by accumulation: every mention a human or a model
+resolves is written back to the alias table, so the system gets permanently better at a class of
+documents. That is the compounding advantage the design rests on.
+
+It is also **lookahead**. The alias table as it stands today knows that a particular surface form
+maps to a particular region — knowledge acquired in 2026. Replay a 2023 document through today's
+resolver and it resolves a mention that, in 2023, nothing could have resolved. The claim enters
+the historical record with an entity link that did not exist at the time, and every downstream
+aggregate over that entity is inflated for the past relative to the present.
+
+**This is the most subtle entry in the register**, because the fix for a real weakness (unresolved
+mentions) creates a leak, and the leak is invisible: nothing is wrong with any individual row.
+
+**Detection.** The one-switch leakage test must cover **resolution**, not just claims — run a
+historical window with the current alias table and with the alias table as it stood at that
+`ingest_time`, and assert the resolved-mention count does not rise.
+
+**Mitigation.** **The alias table is bitemporal too.** Every alias carries the `ingest_time` at
+which it was learned, and a point-in-time replay resolves using only aliases known by then. This
+costs one column and one predicate, and without it the moat quietly manufactures alpha.
+
+---
+
 ## The rest, in short
+
+### Time and lineage
+
+| Mode | Mechanism | Detection | Mitigation |
+|---|---|---|---|
+| **Clock skew across workers** | `ingest_time` is stamped by whichever worker handled the document. A drifting clock reorders events, and a point-in-time read returns rows in an order that never happened | Monitor per-worker offset from a reference; alert past a second | Stamp `ingest_time` at the **database**, not the worker |
+| **Timezone and crop-year conflation** | A crop year differs by origin and a local date boundary is not UTC. Aggregating on the wrong boundary shifts a whole series by up to a day | Assert that every stored timestamp is timezone-aware; reject naive datetimes at the boundary | Store UTC, carry the origin's crop-year convention as entity metadata |
+| **Publisher domain change breaks lineage** | A publisher renames or migrates domain, the syndication graph no longer links old and new, and copies of one story start counting as independent corroboration | Track publisher-count-per-cluster over time; a step change is a lineage break, not a news event | Lineage keyed on a stable publisher id with domain history, never on the domain string |
+
+### The model
+
+| Mode | Mechanism | Detection | Mitigation |
+|---|---|---|---|
+| **Context truncation drops the tail** | The document is appended after a long fixed prefix. A prompt that fit last month silently truncates when the schema grows — **and the number is usually near the end of the article** | Assert prompt token count against the model's window in CI; count truncation events as a first-class metric | Budget the window explicitly: prefix + document + output, with the document chunked rather than clipped |
+| **Pinning to a moving alias** | Pinning to `latest` or an undated model name means the model changes under a stable-looking config, and the golden set silently drifts | Re-run the golden set on a schedule and diff against the recorded baseline — a vendor swap is otherwise invisible | Pin dated model identifiers; treat a model change as a deploy |
+| **Schema evolution orphans old claims** | Adding an enum value makes historical claims unparseable, or worse, the model emits the new value where old semantics applied | Version the schema; assert every stored claim parses under the version it was written with | Additive-only schema changes, and `extractor_version` on every row |
+| **Normalisation drift false-rejects** | The gate compares NFKC-normalised text. A source using different quote characters or non-breaking spaces fails the span check on a claim that is actually correct | Gate rejection rate **by publisher** — a spike in one source is a normalisation bug, not a hallucinating model | Normalise identically on write and check; test the gate against the character classes real sources emit |
+| **Replay fixtures drift from live** | The deterministic replay backend is the reviewer's view of the system. If fixtures are regenerated casually they stop matching what live code produces | CI runs both paths on the same input and diffs | Fixtures are regenerated only with an explicit, reviewed step |
+
+### Operations and cost
+
+| Mode | Mechanism | Detection | Mitigation |
+|---|---|---|---|
+| **Retry storms multiply spend** | A failing downstream triggers retries, each re-sending a long prompt. Cost scales with the failure, and the budget alarm fires after the money is gone | Spend per **successful claim**, not per hour; retry counter as a first-class metric | Bounded retries with jitter, and a circuit breaker that sheds rather than retries |
+| **Prompt cache silently stops working** | Minimum cacheable prefix differs by tier (**4,096 tokens on one, 512 on another**) and is **not monotonic across model generations**. Trim a prompt below the threshold and cost silently multiplies | Cache-hit rate as a monitored metric, not a billing surprise | Assert prefix length in CI; alert on hit-rate drop |
+| **Cache key collides across prompt versions** | The prompt cache keys on the prefix. Two versions with an identical prefix but different downstream instructions share a cache entry and silently serve the wrong semantics | Include the prompt version in the cached prefix itself | Version string inside the cached region, not after it |
+| **Entity-universe survivorship** | The entity graph contains facilities and vessels that exist *now*. Historical analysis silently excludes those that closed, biasing every backward-looking aggregate upward | Count entities with a closed validity range; if it is zero, the graph is not temporal | Entities are `[start, end)` valid, and a historical query includes the ones that have since closed |
+| **Calibration drifts after a regime change** | Confidence was fitted in one regime. After the market shifts, the numbers keep the old shape and stay confidently wrong | Calibration curve per regime, not pooled | Refit on realised outcomes, conditioned on regime |
+
+### Market and legal
+
+| Mode | Mechanism | Detection | Mitigation |
+|---|---|---|---|
+| **Reflexivity** | Once our own trading moves the market, realised information coefficient becomes partly self-fulfilling — and then reverses when size grows | IC measured against a benchmark that excludes own flow; monitor own share of volume | A stated capacity limit and a kill-switch, decided before it matters |
+| **Derived-data licence reaches the index** | Current schedules explicitly cover vector stores and retrieval indexes built on licensed data — so embedding licensed prices is redistribution | Data-provenance tags on every indexed record | Route licensed inputs away from the index; keep the provenance tag queryable, because the licence audit is the query |
+| **MNPI contamination** | A source that turns out to be non-public contaminates every downstream signal, and lineage is what tells you which | Provenance to primary source on every claim — the compliance control is the same lineage the debugging uses | Source allowlist with an explicit public-availability assertion at ingest |
+
+### Sources and signal construction
 
 | Mode | Mechanism | Detection | Mitigation |
 |---|---|---|---|
@@ -101,7 +191,6 @@ assertion, it does not update the old one.
 | **Syndication counted as corroboration** | The same wire story at forty domains looks like forty sources. Measured dedup ratio 0.121 — **12% is echo** | Cluster before counting; count *independent publishers*, not documents | A publisher-lineage graph; corroboration filters on ownership before it counts |
 | **Optical imagery blind when it matters** | The tropical coffee belt is cloud-covered in the wet season — exactly when weather damage happens | Per-AOI observation status; cloud fraction as a first-class field | **SAR primary in wet season**, optical secondary. Where coverage is unavailable the signal **widens its interval** rather than holding its last value |
 | **Surprise treated as strength** | A five-sigma outlier is the most informative thing in the stream *if true* — and is also exactly the shape of a fabrication. Scaling conviction with surprise makes the system farmable | Robust distance from trailing consensus using **median and MAD, never mean and standard deviation** — news figures are heavy-tailed and one outlier poisons a mean-based baseline precisely when it matters | **Invert the reflex: high surprise raises review priority, not confidence.** Costs latency on genuine scoops, which is the correct trade |
-| **Prompt cache silently stops working** | Minimum cacheable prefix differs by tier (**4,096 tokens on one, 512 on another**) and is **not monotonic across model generations**. Trim a prompt below the threshold and cost silently multiplies | Cache-hit rate as a monitored metric, not a billing surprise | Assert prefix length in CI; alert on hit-rate drop |
 | **Wrong instrument** | A regional shock shows up in a **differential**, not flat price. Colombian rust moved the Colombian Milds premium from **+1.5 to +33.6 c/lb** while flat price was noise | Test every signal against the instrument its mechanism implies, before modelling | Instrument selection is part of the claim schema, not an afterthought |
 | **A "leading indicator" computed from the thing it leads** | An index derived from the price it is supposed to predict will always appear predictive | Trace every input to a primary source; reject circular derivations | Provenance to source, enforced in the schema |
 | **Official record treated as the timely one** | Regulatory publication lags the operative event by days — the gazette is the record, not the news | Compare publication timestamp to effective date | Track the operative event, use the official record only for confirmation |
