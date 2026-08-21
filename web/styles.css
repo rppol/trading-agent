@@ -116,6 +116,9 @@ nav.tabs a:hover { color: var(--fg); background: var(--line-2); }
 nav.tabs a[aria-current="page"] {
   color: var(--fg); border-bottom-color: var(--fg); font-weight: 700;
 }
+/* The one tab that leaves the site; sat against the route tabs it read as a
+   sixth document. flex-wrap drops it to its own right-aligned row when narrow. */
+nav.tabs a.ext { margin-left: auto; }
 
 /* ---------------------------------------------------------------- layout */
 

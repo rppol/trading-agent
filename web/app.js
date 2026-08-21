@@ -401,8 +401,13 @@ async function render() {
   const hash = location.hash || "#/";
   const r = ROUTES[hash] || ROUTES["#/"];
   document.documentElement.dataset.surface = r.surface;
+  // toggleAttribute sets aria-current="", which the stylesheet's
+  // [aria-current="page"] never matched -- so no tab has ever shown as active --
+  // and which a screen reader reads as false. The value is the whole point.
   document.querySelectorAll("nav.tabs a").forEach(a =>
-    a.toggleAttribute("aria-current", a.getAttribute("href") === hash));
+    a.getAttribute("href") === hash
+      ? a.setAttribute("aria-current", "page")
+      : a.removeAttribute("aria-current"));
   const view = $("#view");
   const keepScroll = window.__inPlace;
   const y = window.scrollY;
