@@ -18,6 +18,7 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
+from . import ssl_context
 from .store import connect, now, doc_id, upsert_documents, insert_claims, claims_as_of
 
 EXTRACTOR = "coffee-claims/1.2.0"   # prompt semver, pinned into every claim row
@@ -93,7 +94,7 @@ def _batch_published(url: str) -> str | None:
     try:
         req = urllib.request.Request(url, method="HEAD",
                                      headers={"User-Agent": "trading-agent/0.1"})
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context()) as r:
             lm = r.headers.get("Last-Modified")
         if not lm:
             return None
@@ -110,17 +111,32 @@ def _fetch_bytes(url: str, tries: int = 3) -> bytes | None:
     key = CACHE / url.rsplit("/", 1)[-1]
     if key.suffix == ".zip" and key.exists():
         return key.read_bytes()
+    last: Exception | None = None
     for i in range(tries):
         try:
             req = urllib.request.Request(
                 url, headers={"User-Agent": "trading-agent/0.1 (research prototype)"})
-            with urllib.request.urlopen(req, timeout=90) as r:
+            with urllib.request.urlopen(req, timeout=90, context=ssl_context()) as r:
                 data = r.read()
             if key.suffix == ".zip":
                 key.write_bytes(data)
             return data
-        except Exception:
+        except urllib.error.HTTPError as e:
+            last = e
+            # lastupdate.txt advertises the newest batch -- with its size and MD5 --
+            # several minutes before the CDN serves it, so the head of any window
+            # 404s. That is a publishing lag, not a transient error: retrying costs
+            # 12s per batch and cannot succeed. A later poll picks the file up,
+            # because the store is append-only and zips are cached on disk.
+            if e.code == 404:
+                break
             time.sleep(2 * (i + 1))
+        except Exception as e:
+            last = e
+            time.sleep(2 * (i + 1))
+    # Say why. A swallowed exception here is indistinguishable downstream from a
+    # window in which nothing about coffee was published.
+    print(f"  fetch failed after {tries} tries: {url}: {last!r}", file=sys.stderr)
     return None
 
 
@@ -130,10 +146,12 @@ def batch_stamps(n: int) -> list[str]:
     ingest boundary, so a replay cannot accidentally include a later batch."""
     raw = _fetch_bytes(LAST_UPDATE)
     if not raw:
-        return []
+        raise RuntimeError(
+            f"GDELT index unreachable ({LAST_UPDATE}). Refusing to return an empty "
+            "window: not_observed is not the same claim as observed_absent.")
     m = re.search(r"/(\d{14})\.gkg", raw.decode("utf-8", "replace"))
     if not m:
-        return []
+        raise RuntimeError(f"GDELT index parsed but carried no .gkg stamp: {raw[:200]!r}")
     t = datetime.strptime(m.group(1), "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
     return [(t - timedelta(minutes=15 * i)).strftime("%Y%m%d%H%M%S") for i in range(n)]
 
@@ -248,16 +266,27 @@ def fetch(n_batches: int = 24, **_) -> list[dict]:
     and are what a production ingest would use anyway."""
     docs: dict[str, dict] = {}
     stamps = batch_stamps(n_batches)
+    ok = 0
     for i, st in enumerate(stamps):
         url = f"{GKG_BASE}{st}.gkg.csv.zip"
         blob = _fetch_bytes(url)
         if not blob:
             continue
+        ok += 1
         got = parse_batch(blob, st, _batch_published(url))
         for d in got:
             docs.setdefault(d["url"], d)
         print(f"  batch {i+1}/{len(stamps)} {st}: +{len(got)} (total {len(docs)})",
               file=sys.stderr)
+    # Zero documents out of zero batches is a broken ingest. Zero documents out of
+    # N downloaded batches is a real observation about the world -- coffee is a
+    # narrow filter and most quarter-hours carry nothing. Only the first is an error.
+    if ok == 0:
+        raise RuntimeError(
+            f"downloaded 0 of {len(stamps)} GDELT batches -- ingest failed, "
+            "and an empty corpus here would overwrite the committed fixtures")
+    print(f"  {ok}/{len(stamps)} batches downloaded, {len(docs)} coffee documents",
+          file=sys.stderr)
     return list(docs.values())
 
 
@@ -351,10 +380,17 @@ def _claude(prompt: str, model: str = "sonnet") -> tuple[str, dict]:
     if p.returncode != 0:
         raise RuntimeError(p.stderr[:400])
     env = json.loads(p.stdout)
+    u = env.get("usage", {})
+    # input_tokens counts only what MISSED the cache. Reporting it alone showed
+    # "10 input tokens" for a 4,000-token extraction prompt and made the one lever
+    # the cost model actually rests on -- caching a long fixed prefix -- invisible
+    # in our own meter. Split it out instead: cached reads are billed at 10%.
     return env.get("result", ""), {
         "usd": env.get("total_cost_usd", 0.0),
-        "in": env.get("usage", {}).get("input_tokens", 0),
-        "out": env.get("usage", {}).get("output_tokens", 0),
+        "in": u.get("input_tokens", 0),
+        "cache_write": u.get("cache_creation_input_tokens", 0),
+        "cache_read": u.get("cache_read_input_tokens", 0),
+        "out": u.get("output_tokens", 0),
     }
 
 
@@ -423,7 +459,7 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
     tools, and every claim is gated on a verbatim span before it can score."""
     usable = [d for d in docs if (d.get("snippet") or "").strip()]
     claims: list[dict] = []
-    meter = {"usd": 0.0, "in": 0, "out": 0, "calls": 0}
+    meter = {"usd": 0.0, "in": 0, "cache_write": 0, "cache_read": 0, "out": 0, "calls": 0}
     by_url = {d["url"]: d for d in usable}
     derived_at = now()
 
@@ -458,6 +494,8 @@ def extract(docs: list[dict], backend: str = "claude-cli", batch: int = 8) -> tu
                 print(f"  extract batch {i//batch} failed: {e}", file=sys.stderr)
                 continue
             meter["usd"] += m["usd"]; meter["in"] += m["in"]
+            meter["cache_write"] += m.get("cache_write", 0)
+            meter["cache_read"] += m.get("cache_read", 0)
             meter["out"] += m["out"]; meter["calls"] += 1
             raw.extend(_parse_array(text))
             print(f"  batch {i//batch+1}: {len(chunk)} docs -> {len(raw)} claims cum, "

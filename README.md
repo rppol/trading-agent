@@ -17,7 +17,7 @@ cached queries and minutes for fresh inference.
 | # | Deliverable | Where |
 |---|---|---|
 | 1 | Architecture document with diagrams | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| 2 | Working prototype — GDELT → LLM → API | this repo, `make all` |
+| 2 | Working prototype — GDELT → LLM → API | [the code](#the-code), `make all` |
 | 3 | Failure modes, detection and mitigation | [docs/FAILURE_MODES.md](docs/FAILURE_MODES.md) |
 | + | What was tested, and what died | [docs/EVIDENCE.md](docs/EVIDENCE.md) |
 | 4 | Back-of-envelope cost estimate | [docs/COST.md](docs/COST.md) + interactive model on the site |
@@ -53,7 +53,7 @@ is the part that distinguishes this from a design nobody tried to falsify.
 
 ```bash
 make setup                 # uv venv + deps (uv must be on PATH)
-make test                  # 7 assert-based checks, no framework
+make test                  # 14 assert-based checks, no framework
 
 make export && make serve  # replay the committed fixtures, serve API + site on :8000
 ```
@@ -106,9 +106,33 @@ fixtures/       real GDELT documents and real LLM extractions, committed
 tests/          assert-based checks incl. the leakage switch
 ```
 
-## Things worth reading the code for
+## The code
 
-- `store.claims_as_of` — point-in-time replay is one predicate on `ingest_time`
-- `pipeline.cluster` — syndication collapse and novelty weighting
-- `pipeline.extract` — the verbatim-span gate that rejects invented numbers
-- `tests/test_leakage_switch` — measures lookahead instead of warning about it
+Deliverable 2 is ~1,900 lines of Python. The two files that carry it:
+
+| File | What it is |
+|---|---|
+| **[signals/api.py](signals/api.py)** | The **API**. `GET /v1/signals/{commodity}` (cached, and point-in-time via `?as_of=`), `/history`, `/v1/claims` (evidence ledger), `POST /v1/refresh` + `/v1/jobs/{id}` (async fresh inference), `/v1/metrics`, `/healthz` |
+| **[signals/pipeline.py](signals/pipeline.py)** | The **signal extraction**. GDELT ingest → syndication collapse → LLM claim extraction → grounding gate → scoring |
+| [signals/store.py](signals/store.py) | Bitemporal SQLite. `as_of` is one predicate on `ingest_time` |
+| [signals/cli.py](signals/cli.py) | What the `make` targets call |
+| [tests/test_pipeline.py](tests/test_pipeline.py) | 14 assert-based checks, no framework |
+| [fixtures/](fixtures/) | Real GDELT documents and real LLM extractions, committed so a reviewer can run it without a key |
+
+Reading it in one pass:
+
+| Where | Why it is the interesting part |
+|---|---|
+| [`pipeline.extract`](signals/pipeline.py) | The LLM emits typed **claims**, never a price. Every numeric claim must appear verbatim in the cited span or it is rejected — see `pipeline.ground` |
+| [`pipeline.score`](signals/pipeline.py) | Claims become the three signals by **arithmetic**, not by a model. This is where "extraction is not prediction" stops being a slogan |
+| [`store.claims_as_of`](signals/store.py) | Point-in-time replay is one `WHERE ingest_time <= ?`. Ten lines that prove no lookahead |
+| [`pipeline.cluster`](signals/pipeline.py) | Syndication collapse — the 40th reprint carries no information, so novelty is a signal input |
+| [`test_leakage_switch`](tests/test_pipeline.py) | Measures lookahead in CI instead of warning about it in prose |
+
+### The three signals
+
+| Signal | Range | Character |
+|---|---|---|
+| `supply_risk` | 0–100 | Continuous. Severity × certainty, tagged by driver (`weather_frost`, `disease_pest`, `logistics_port`) and origin |
+| `price_pressure` | −100…+100 | Directional, derived in code from a stated physical fact — never extracted from the model |
+| `policy_shock` | 0–100 | Discontinuous. Export bans, tariffs, EUDR, with jurisdiction and effective date |

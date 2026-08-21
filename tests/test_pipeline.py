@@ -226,6 +226,40 @@ def test_relevance_filter():
     print("ok  filter keeps market stories incl. deforestation/port/stock, drops retail")
 
 
+# ---------------------------------------------------------------- ingest failure
+
+def test_dead_network_raises_instead_of_reporting_an_empty_window():
+    """A CA-bundle failure made every fetch return None, batch_stamps return [],
+    and the CLI print {"seen": 0} and exit 0 -- a total outage wearing the costume
+    of a quiet news day. Worse, the ingest then wrote that empty result over the
+    committed fixtures. not_observed must never be served as observed_absent."""
+    orig = P._fetch_bytes
+    try:
+        P._fetch_bytes = lambda url, tries=3: None
+        for fn, label in ((P.batch_stamps, "batch_stamps"), (P.fetch, "fetch")):
+            try:
+                fn(3)
+            except RuntimeError:
+                pass
+            else:
+                raise AssertionError(f"{label} returned quietly on a dead network")
+
+        # Batches that download but carry no coffee IS a real observation, not an
+        # error -- the distinction the whole fix turns on.
+        orig_parse, orig_pub = P.parse_batch, P._batch_published
+        try:
+            P._fetch_bytes = (lambda url, tries=3:
+                              b"/20260821084500.gkg" if "lastupdate" in url else b"zipbytes")
+            P.parse_batch = lambda blob, stamp, published=None: []
+            P._batch_published = lambda url: None
+            assert P.fetch(1) == [], "a live but coffee-free window is not an error"
+        finally:
+            P.parse_batch, P._batch_published = orig_parse, orig_pub
+    finally:
+        P._fetch_bytes = orig
+    print("ok  dead network raises; an empty-but-live window does not")
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

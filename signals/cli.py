@@ -2,8 +2,8 @@
 import argparse
 import json
 
-from .store import connect, upsert_documents, insert_claims
-from .pipeline import fetch, cluster, extract
+from .store import connect, upsert_documents, insert_claims, docs_as_of, claims_as_of
+from .pipeline import fetch, cluster, extract, EXTRACTOR
 
 
 def main():
@@ -22,10 +22,18 @@ def main():
             conn.execute("UPDATE documents SET cluster_id=?, novelty=? WHERE doc_id=?",
                          (d["cluster_id"], d["novelty"], d["doc_id"]))
         conn.commit()
+        # Snapshot the STORE, not this run's fetch. Writing the fetch made the
+        # fixtures only as large as the last window: one quiet six-hour pull
+        # truncated the committed 33-document replay corpus that the demo, the
+        # tests and the published site all read from. The store is append-only
+        # by upsert, so this can grow and can never shrink.
+        held = [dict(r) for r in docs_as_of(conn)]
+        for r in held:
+            r["raw"] = json.loads(r["raw"])   # stored as text, fixtures carry the object
         with open("fixtures/documents.jsonl", "w") as f:
-            for d in docs:
+            for d in held:
                 f.write(json.dumps(d) + "\n")
-        print(json.dumps({"seen": len(docs), "new": new,
+        print(json.dumps({"seen": len(docs), "new": new, "corpus": len(held),
                           "clusters": len({d['cluster_id'] for d in docs})}))
 
     elif a.cmd == "restore":
@@ -44,12 +52,26 @@ def main():
 
     elif a.cmd == "extract":
         docs = [json.loads(l) for l in open("fixtures/documents.jsonl")]
-        claims, meter = extract(docs, backend=a.backend)
-        insert_claims(conn, claims)
+        # Skip what this prompt version already covered. claim_id embeds the
+        # extractor semver, so a re-run was idempotent but still paid the model
+        # for every document a second time. A prompt bump re-extracts everything,
+        # which is the point of pinning the version into the id.
+        done = {r["doc_id"] for r in conn.execute(
+            "SELECT DISTINCT doc_id FROM claims WHERE extractor = ?", (EXTRACTOR,))}
+        todo = [d for d in docs if d["doc_id"] not in done]
+        claims, meter = extract(todo, backend=a.backend) if todo else ([], {})
+        landed = insert_claims(conn, claims)
+        # Snapshot the store, not this run -- the fixtures are the replay corpus,
+        # and writing only the new claims would delete every earlier one.
+        held = [dict(r) for r in claims_as_of(conn)]
+        for r in held:
+            r["payload"] = json.loads(r["payload"])
         with open("fixtures/claims.jsonl", "w") as f:
-            for c in claims:
+            for c in held:
                 f.write(json.dumps(c) + "\n")
-        print(json.dumps({"claims": len(claims), **meter}))
+        print(json.dumps({"documents": len(docs), "extracted": len(todo),
+                          "skipped": len(docs) - len(todo), "claims_new": landed,
+                          "claims_total": len(held), **meter}))
 
 
 if __name__ == "__main__":
